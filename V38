@@ -1,0 +1,509 @@
+/**
+ * -----------------------------------------------------------------------
+ * COMPLETE GOOGLE DRIVE & GEMINI AUTOMATION SCRIPT (V38 - METADATA INJECTION)
+ * -----------------------------------------------------------------------
+ * Features:
+ * 1. MODEL: Gemini 2.5 Pro.
+ * 2. BRIEF DOCTOR FIX: AI now sees Filename Metadata (Budget/Deadline).
+ * - Prevents false "Missing Budget" flags.
+ * - Improves Brief Score.
+ * 3. NOTIFICATIONS: Brand, Budget, Old/New Deadlines.
+ * 4. STANDARD FEATURES: Hybrid processing, formatting, etc.
+ * -----------------------------------------------------------------------
+ */
+
+// --- 1. CONFIGURATION ---
+const CONFIG = {
+  newFilesFolderId: "1s38bsuQmoFwegyadmSypA5yryXRmcQt_", 
+  archiveFolderId: "1V84LSzqtreZveMFiNyvyGXM7JFHM1cYx", 
+  summaryDocsFolderId: "1WoUhjP7QzZuExCYx2NKe1j2dam-AyG3n",
+  sheetName: "Sheet1",
+  
+  // --- NOTIFICATION CONFIG ---
+  webhookUrl: "https://chat.googleapis.com/v1/spaces/AAQAZA-6mbY/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=PgayoBjpQ6zvPJF9iTSSxe79MPo4_-57Z0K9SX8HdWY",
+  
+  // Column Indexes (A=1, B=2, etc.)
+  colIndices: {
+    brand: 4,        // Column D: Brand (NEW)
+    project: 5,      // Column E
+    strat: 7,        // Column G
+    cc: 8,           // Column H
+    status: 10,      // Column J
+    proposalLink: 11,// Column K
+    deadline: 12,    // Column L
+    linkStart: 15,   // Column O
+    linkEnd: 18      // Column R
+  }
+};
+
+// --- SCRIPT ---
+
+function onOpen() { setupSheetAndMenu(); }
+
+function setupSheetAndMenu() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('Automation Menu')
+      .addItem('Process New Files Now', 'processNewFiles')
+      .addSeparator()
+      .addItem('Reset Sheet Headers (V36 Layout)', 'resetHeaders')
+      .addItem('Setup Notification Triggers', 'createSystemTriggers')
+      .addItem('Check Available AI Models', 'checkAvailableModels')
+      .addToUi();
+  } catch (e) {
+    console.warn("UI Menu creation skipped: Script is running in background context.");
+  }
+}
+
+function resetHeaders() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+  if (!sheet) return;
+  const headers = [
+    "Tracking Code", "Type of Deck", "Parent Company", "Brand", "Campaign/Project Name",
+    "Budget", "Strat", "Client Champion", "Industry or Internal",
+    "Status", "Proposal Link", "Deadline", "Summary Doc Link", 
+    "OG Brief Link 1", "OG Brief Link 2", "OG Brief Link 3", "OG Brief Link 4", "OG Brief Link 5", 
+    "Brief Score", "Missing Info", "Generated On?"
+  ];
+  sheet.getRange(1, 1, 1, 21).clearContent();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+}
+
+function createSystemTriggers() {
+  const existingTriggers = ScriptApp.getProjectTriggers();
+  let timeTriggerExists = false;
+  let editTriggerExists = false;
+
+  existingTriggers.forEach(t => {
+    if (t.getHandlerFunction() === 'processNewFiles') timeTriggerExists = true;
+    if (t.getHandlerFunction() === 'onStatusChange') editTriggerExists = true;
+  });
+
+  if (!timeTriggerExists) {
+    ScriptApp.newTrigger('processNewFiles').timeBased().everyMinutes(10).create();
+  }
+  
+  if (!editTriggerExists) {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet();
+    ScriptApp.newTrigger('onStatusChange').forSpreadsheet(sheet).onEdit().create();
+  }
+
+  try { SpreadsheetApp.getUi().alert('Success! All automation and notification triggers are set.'); } catch(e) {}
+}
+
+function getMention(name) {
+  if (!name) return "N/A";
+  const cleanName = String(name).trim();
+  return `*${cleanName}*`; 
+}
+
+function onStatusChange(e) {
+  if (!e || !e.range) return;
+  const sheet = e.range.getSheet();
+  if (sheet.getName() !== CONFIG.sheetName) return;
+
+  const colIndex = e.range.getColumn();
+  const rowIndex = e.range.getRow();
+  if (rowIndex <= 1) return;
+
+  const project = sheet.getRange(rowIndex, CONFIG.colIndices.project).getValue();
+  const brand = sheet.getRange(rowIndex, CONFIG.colIndices.brand).getValue(); 
+  const stratName = sheet.getRange(rowIndex, CONFIG.colIndices.strat).getValue();
+  const ccName = sheet.getRange(rowIndex, CONFIG.colIndices.cc).getValue();
+  const cellValue = e.value || e.range.getValue();
+  const newValue = String(cellValue).toLowerCase();
+
+  // 1. STATUS UPDATE
+  if (colIndex === CONFIG.colIndices.status) {
+    if (newValue === "done" || newValue === "completed") {
+      const proposalLink = sheet.getRange(rowIndex, CONFIG.colIndices.proposalLink).getValue();
+      const proposalDisplay = proposalLink ? proposalLink : "N/A";
+      const message = `✅ *Proposal Completed*\n\n*Brand:* ${brand}\n*Strat:* ${getMention(stratName)} has marked the project as done.\n*Project:* ${project}\n*CC:* ${getMention(ccName)}\n*Proposal:* ${proposalDisplay}`;
+      sendWebhook(message);
+    }
+  }
+
+  // 2. STRAT HANDOVER
+  if (colIndex === CONFIG.colIndices.strat && cellValue) {
+    const message = `🔄 *Strat Update / Handover*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Update:* ${getMention(cellValue)} has taken over this project.`;
+    sendWebhook(message);
+  }
+
+  // 3. DEADLINE CHANGE
+  if (colIndex === CONFIG.colIndices.deadline) {
+    const newDeadline = e.range.getDisplayValue(); 
+    let oldDeadline = e.oldValue || "N/A"; 
+    if (oldDeadline !== "N/A" && !isNaN(oldDeadline) && Number(oldDeadline) > 20000) {
+      const serial = Number(oldDeadline);
+      const dateDate = new Date((serial - 25569) * 86400 * 1000);
+      oldDeadline = Utilities.formatDate(dateDate, Session.getScriptTimeZone(), "dd/MM/yyyy");
+    }
+    if (newDeadline) {
+      const message = `📅 *Deadline Updated*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Old Deadline:* ${oldDeadline}\n*New Deadline:* ${newDeadline}\n\n*CC:* ${getMention(ccName)}\n*Strat:* ${getMention(stratName)}`;
+      sendWebhook(message);
+    }
+  }
+
+  // 4. NEW FILE ADDED
+  if (colIndex >= CONFIG.colIndices.linkStart && colIndex <= CONFIG.colIndices.linkEnd && cellValue) {
+    const message = `📂 *Additional File Added*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Update:* Additional brief documents have been added.\n\n*CC:* ${getMention(ccName)}\n*Strat:* ${getMention(stratName)} please review.`;
+    sendWebhook(message);
+  }
+}
+
+function sendWebhook(text) {
+  if (!CONFIG.webhookUrl || CONFIG.webhookUrl.includes("PASTE_YOUR")) {
+    Logger.log("Webhook URL not set.");
+    return;
+  }
+  const payload = JSON.stringify({ "text": text });
+  const options = { 'method': 'post', 'contentType': 'application/json', 'payload': payload, 'muteHttpExceptions': true };
+  try { UrlFetchApp.fetch(CONFIG.webhookUrl, options); } catch (e) { Logger.log("Webhook failed: " + e.toString()); }
+}
+
+// ... PROCESS FILES LOGIC ...
+
+function processNewFiles() {
+  const newFilesFolder = DriveApp.getFolderById(CONFIG.newFilesFolderId);
+  const archiveFolder = DriveApp.getFolderById(CONFIG.archiveFolderId);
+  const summaryFolder = DriveApp.getFolderById(CONFIG.summaryDocsFolderId);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+  
+  const files = newFilesFolder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    processItem(file, sheet, archiveFolder, summaryFolder, false);
+  }
+
+  const subFolders = newFilesFolder.getFolders();
+  while (subFolders.hasNext()) {
+    const folder = subFolders.next();
+    processItem(folder, sheet, archiveFolder, summaryFolder, true);
+  }
+}
+
+function processItem(item, sheet, archiveFolder, summaryFolder, isFolder) {
+  const name = item.getName();
+  if (!isValidNamingConvention(name)) {
+    Logger.log(`[SKIP] Ignored (Wrong Format): ${name}`);
+    return;
+  }
+
+  Logger.log(`Processing: ${name}`);
+  const fileNameData = parseFilenameMetadata(name); 
+  
+  // Extract Text
+  let text = "";
+  let fileLinks = ["", "", "", "", ""];
+  let filesCount = 0;
+
+  if (isFolder) {
+    const folderFiles = item.getFiles();
+    let i = 0;
+    while (folderFiles.hasNext()) {
+      const f = folderFiles.next();
+      if (i < 5) fileLinks[i] = `=HYPERLINK("${f.getUrl()}", "📂 Open File")`;
+      Logger.log(`Reading file ${i+1}: ${f.getName()}`);
+      let extracted = extractTextSmartly(f);
+      if (extracted) text += `\n\n--- FILE: ${f.getName()} ---\n${extracted}\n`;
+      i++;
+      filesCount++;
+      Utilities.sleep(1000);
+    }
+    if (filesCount === 0) return; 
+  } else {
+    text = extractTextSmartly(item);
+    fileLinks[0] = `=HYPERLINK("${item.getUrl()}", "📂 Open File")`;
+  }
+
+  if (text) {
+    // --- GEMINI ANALYSIS (With Metadata Injection) ---
+    // We pass 'fileNameData' to the AI so it knows the Budget/Deadline exists
+    let aiData = getAiDataWithFallback(text, fileNameData);
+    
+    if (aiData) {
+      const trackingCode = generateTrackingCode();
+      const summaryDoc = createSummaryDoc(aiData, trackingCode, summaryFolder, `Source: ${name}`);
+      const summaryLink = `=HYPERLINK("${summaryDoc.getUrl()}", "📄 View Summary")`;
+
+      // APPEND TO SHEET
+      appendDataToSheet(sheet, trackingCode, fileNameData, aiData, summaryLink, fileLinks);
+      
+      // NOTIFY
+      let scoreEmoji = aiData.briefScore >= 7 ? "🟢" : (aiData.briefScore >= 5 ? "🟡" : "🔴");
+      
+      // Format Budget with Commas
+      let budgetDisplay = fileNameData.budget ? `RM ${fileNameData.budget.toLocaleString()}` : "N/A";
+
+      const notifyMsg = `🚀 *New Brief Uploaded*\n\n*Brand:* ${aiData.brand}\n*Project:* ${aiData.campaignName}\n*Budget:* ${budgetDisplay}\n*Score:* ${scoreEmoji} ${aiData.briefScore}/10\n*Missing:* ${aiData.missingInfo || "None"}\n\n*CC:* ${getMention(fileNameData.clientChampion)}\n*Strat:* ${getMention(fileNameData.strat)}`;
+      sendWebhook(notifyMsg);
+
+      if (isFolder) moveFolderToArchive(item, archiveFolder);
+      else item.moveTo(archiveFolder);
+    }
+  }
+}
+
+// ... HELPERS ...
+
+function extractTextSmartly(file) {
+  const mimeType = file.getMimeType();
+  if (mimeType === 'message/rfc822' || mimeType.startsWith('text/')) {
+    return file.getBlob().getDataAsString();
+  }
+  return performRobustOCR(file);
+}
+
+function parseFilenameMetadata(fileName) {
+  const parts = fileName.split('_');
+  const rawDate = parts.length > 4 ? parts.slice(4).join('_').trim() : "";
+  let dateObj = rawDate;
+  if (rawDate) {
+    const dateParts = rawDate.split('/'); 
+    if (dateParts.length === 3) dateObj = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+  }
+  
+  // BUDGET PARSING (Numeric Enforcement)
+  let rawBudget = parts.length > 2 ? parts[2].trim().toUpperCase() : "";
+  let cleanBudget = "";
+  if (rawBudget) {
+    let multiplier = 1;
+    if (rawBudget.includes("K")) multiplier = 1000;
+    cleanBudget = rawBudget.replace(/[^0-9.]/g, '');
+    if (cleanBudget) cleanBudget = parseFloat(cleanBudget) * multiplier;
+  }
+
+  return {
+      clientChampion: parts.length > 0 ? parts[0].trim() : "N/A",
+      strat:          parts.length > 1 ? parts[1].trim() : "N/A",
+      budget:         cleanBudget, // Now a Number or Empty String
+      typeOfDeck:     parts.length > 3 ? parts[3].trim() : "N/A",
+      deadline:       dateObj 
+  };
+}
+
+function createSummaryDoc(aiData, trackingCode, folder, sourceInfo) {
+  const summaryDoc = DocumentApp.create(`${trackingCode} - ${aiData.campaignName || 'Untitled'} - Summary`);
+  const summaryDocFile = DriveApp.getFileById(summaryDoc.getId());
+  folder.addFile(summaryDocFile);
+  DriveApp.getRootFolder().removeFile(summaryDocFile);
+  
+  const body = summaryDoc.getBody();
+  addSection(body, "Metadata", sourceInfo);
+  
+  // Brief Doctor Score Header
+  body.appendParagraph(`Brief Quality Score: ${aiData.briefScore}/10`).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  if (aiData.missingInfo && aiData.missingInfo !== "None") {
+    body.appendParagraph(`⚠️ Missing Info: ${aiData.missingInfo}`).setForegroundColor("#FF0000");
+  }
+
+  addSection(body, "Core Brief Requirements", aiData.summary_brief);
+  addSection(body, "Timeline & Period", aiData.summary_campaignPeriod);
+  addSection(body, "Target Audience", aiData.summary_targetAudience);
+  addSection(body, "Key Deliverables", aiData.summary_campaignDetails);
+  addSection(body, "Mandatory Inclusions", aiData.summary_buzzIdeas);
+  addSection(body, "Budget Breakdown", aiData.summary_budget);
+  
+  return summaryDoc;
+}
+
+function appendDataToSheet(sheet, trackingCode, fileNameData, aiData, summaryLink, fileLinksArray) {
+  const lastRow = sheet.getLastRow() + 1;
+  sheet.appendRow([
+    trackingCode, 
+    fileNameData.typeOfDeck, 
+    aiData.parentCompany || "N/A", 
+    aiData.brand || "N/A", 
+    aiData.campaignName || "N/A", 
+    fileNameData.budget, // Number
+    fileNameData.strat, 
+    fileNameData.clientChampion, 
+    aiData.industryOrInternal || "N/A", 
+    "", "", 
+    fileNameData.deadline, 
+    summaryLink,
+    fileLinksArray[0], fileLinksArray[1], fileLinksArray[2], fileLinksArray[3], fileLinksArray[4], 
+    aiData.briefScore, 
+    aiData.missingInfo, 
+    new Date()
+  ]);
+  sheet.getRange(lastRow, 6).setNumberFormat('"RM" #,##0.00'); 
+  sheet.getRange(lastRow, 12).setNumberFormat('dd/mm/yyyy');
+}
+
+function moveFolderToArchive(sourceFolder, targetParentFolder) {
+  const newFolder = targetParentFolder.createFolder(sourceFolder.getName());
+  const files = sourceFolder.getFiles();
+  while (files.hasNext()) { files.next().moveTo(newFolder); }
+  const subFolders = sourceFolder.getFolders();
+  while (subFolders.hasNext()) { moveFolderToArchive(subFolders.next(), newFolder); }
+  sourceFolder.setTrashed(true);
+}
+
+function addSection(body, title, content) {
+  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  let textToWrite = 'N/A';
+  if (content) {
+    if (Array.isArray(content)) {
+      textToWrite = content.map(item => {
+        if (typeof item === 'object' && item !== null) return Object.values(item).join(' - ');
+        return String(item);
+      }).join('\n');
+    } else if (typeof content === 'object') {
+      textToWrite = JSON.stringify(content, null, 2);
+    } else {
+      textToWrite = String(content);
+    }
+  }
+  body.appendParagraph(textToWrite);
+}
+
+function performRobustOCR(file) {
+  let attempts = 0;
+  while (attempts < 3) {
+    let tempDocId = null;
+    try {
+      const fileBlob = file.getBlob();
+      const resource = { title: `[TEMP OCR] ${file.getName()}`, mimeType: fileBlob.getContentType() };
+      const tempDocFile = Drive.Files.insert(resource, fileBlob, { ocr: true });
+      tempDocId = tempDocFile.id;
+      const text = DocumentApp.openById(tempDocId).getBody().getText();
+      DriveApp.getFileById(tempDocId).setTrashed(true);
+      return text; 
+    } catch (e) {
+      if (tempDocId) try { DriveApp.getFileById(tempDocId).setTrashed(true); } catch(err){}
+      if (e.toString().includes("rate limit")) {
+        attempts++;
+        Utilities.sleep(attempts * 5000); 
+      } else {
+        return null; 
+      }
+    }
+  }
+  return null;
+}
+
+// UPDATED: Now accepts 'metadata' to inject filename info into prompt
+function getAiDataWithFallback(fileContent, metadata) {
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  const models = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`
+  ];
+
+  // Helper to format date for AI prompt
+  let deadlineStr = "Unknown";
+  if (metadata.deadline instanceof Date) {
+    deadlineStr = Utilities.formatDate(metadata.deadline, Session.getScriptTimeZone(), "dd/MM/yyyy");
+  }
+
+  const prompt = `
+    You are an expert Strategic Planner performing a "Brief Audit".
+    Analyze the provided project documents. 
+    
+    CRITICAL: You are provided with "Context from Filename" below. 
+    Use this metadata (Budget, Deadline, etc.) as confirmed facts. 
+    DO NOT mark Budget or Timeline as missing if they appear in the Filename Metadata.
+    
+    CONTEXT FROM FILENAME:
+    - Budget: ${metadata.budget || "Unknown"}
+    - Deadline: ${deadlineStr}
+    - CC: ${metadata.clientChampion}
+    - Strat: ${metadata.strat}
+    
+    1. EXTRACT key information.
+    2. GRADE the brief quality (1-10).
+       - If Budget and Deadline are in the Context above, give full points for those categories.
+    3. IDENTIFY missing info.
+    
+    Return ONLY a JSON object:
+    "brand", "campaignName", "parentCompany", "industryOrInternal", "summary_brief", "summary_campaignPeriod", "summary_targetAudience", "summary_campaignDetails", "summary_buzzIdeas", "summary_budget", "briefScore", "missingInfo".
+    
+    Instructions:
+    - "brand" & "parentCompany": Title Case.
+    - "briefScore": Number.
+    - "missingInfo": String. Write "None" if all key info (Budget, Audience, Deliverables, Timeline) is present in either text or metadata.
+    
+    TEXT TO ANALYZE:
+    ${fileContent.substring(0, 80000)} 
+  `;
+  
+  const payload = JSON.stringify({ "contents": [{ "parts": [{ "text": prompt }] }] });
+  const options = { 'method': 'post', 'contentType': 'application/json', 'payload': payload, 'muteHttpExceptions': true };
+
+  for (const url of models) {
+    try {
+      const response = UrlFetchApp.fetch(url, options);
+      if (response.getResponseCode() === 200) {
+        const json = JSON.parse(response.getContentText());
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
+          let data = JSON.parse(cleanJson);
+
+          // Logic Updates
+          const toTitleCase = (str) => {
+            if (!str) return str;
+            return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+          };
+          if (data.brand && data.brand !== "N/A") data.brand = toTitleCase(data.brand);
+          if (data.parentCompany && data.parentCompany !== "N/A") data.parentCompany = toTitleCase(data.parentCompany);
+          if ((!data.parentCompany || data.parentCompany === "N/A") && (data.brand && data.brand !== "N/A")) data.parentCompany = data.brand;
+          if ((!data.brand || data.brand === "N/A") && (data.parentCompany && data.parentCompany !== "N/A")) data.brand = data.parentCompany;
+          
+          const badNames = ["N/A", "Not Specified", "Not specified", "Untitled", "Unknown", "TBD"];
+          if (!data.campaignName || badNames.includes(data.campaignName) || data.campaignName.trim() === "") {
+             data.campaignName = `Proposal For ${data.brand || "Client"}`;
+          }
+
+          // Force inject Budget/Deadline if AI missed it but Filename has it
+          if ((!data.summary_budget || data.summary_budget === "N/A" || data.summary_budget === "Not specified") && metadata.budget) {
+             data.summary_budget = `RM ${metadata.budget} (Sourced from filename)`;
+          }
+
+          return data;
+        }
+      }
+    } catch (e) { Logger.log(`Model Error: ${e.toString()}`); }
+  }
+  return null;
+}
+
+function generateTrackingCode() {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const now = new Date();
+  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const datePrefix = months[now.getMonth()] + String(now.getDate()).padStart(2, '0');
+  const lastDate = scriptProperties.getProperty('tracking_lastDate');
+  let sequence = (lastDate !== datePrefix) ? 'A' : incrementString(scriptProperties.getProperty('tracking_sequence') || 'A');
+  scriptProperties.setProperties({ 'tracking_lastDate': datePrefix, 'tracking_sequence': sequence });
+  return datePrefix + sequence;
+}
+
+function incrementString(str) {
+  let carry = 1, result = '';
+  for (let i = str.length - 1; i >= 0; i--) {
+    let charCode = str.charCodeAt(i) + carry;
+    carry = 0;
+    if (charCode > 90) { charCode = 65; carry = 1; }
+    result = String.fromCharCode(charCode) + result;
+  }
+  return (carry > 0 ? 'A' : '') + result;
+}
+
+function isValidNamingConvention(name) {
+  if (name.startsWith("~$")) return false; 
+  const parts = name.split('_');
+  return parts.length >= 5;
+}
+
+function checkAvailableModels() {
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!API_KEY) { Logger.log("FATAL ERROR: GEMINI_API_KEY not found."); return; }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
+  try {
+    const response = UrlFetchApp.fetch(url, { 'method': 'get', 'muteHttpExceptions': true });
+    Logger.log(response.getContentText());
+  } catch (e) { Logger.log(e.toString()); }
+}
