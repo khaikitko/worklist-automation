@@ -1,0 +1,710 @@
+/**
+ * -----------------------------------------------------------------------
+ * COMPLETE GOOGLE DRIVE & GEMINI AUTOMATION SCRIPT (V51 - SAFETY LOCK)
+ * -----------------------------------------------------------------------
+ * Features:
+ * 1. SAFETY LOCK: Explicitly ignores Archive/Summary Folder IDs.
+ * 2. STRICT MODE: Only processes files/folders with 4 underscores.
+ * 3. MODEL: Gemini 2.5 Pro / 1.5 Pro.
+ * 4. DASHBOARD V5: Padded Container, Centered UI.
+ * -----------------------------------------------------------------------
+ */
+
+// --- 1. CONFIGURATION ---
+const CONFIG = {
+  // YOUR INTEGRATED FOLDER IDS
+  newFilesFolderId: "1s38bsuQmoFwegyadmSypA5yryXRmcQt_", 
+  archiveFolderId: "1V84LSzqtreZveMFiNyvyGXM7JFHM1cYx", 
+  summaryDocsFolderId: "1WoUhjP7QzZuExCYx2NKe1j2dam-AyG3n",
+  
+  sheetName: "Sheet1",
+  dashboardName: "📊 Dashboard",
+  
+  // YOUR INTEGRATED WEBHOOK
+  webhookUrl: "https://chat.googleapis.com/v1/spaces/AAQAZA-6mbY/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=PgayoBjpQ6zvPJF9iTSSxe79MPo4_-57Z0K9SX8HdWY",
+  
+  // Column Indexes (A=1, B=2, etc.)
+  colIndices: {
+    brand: 4,        // Column D
+    project: 5,      // Column E
+    strat: 7,        // Column G
+    cc: 8,           // Column H
+    status: 10,      // Column J
+    proposalLink: 11,// Column K
+    deadline: 12,    // Column L
+    linkStart: 15,   // Column O
+    linkEnd: 18      // Column R
+  }
+};
+
+// --- SCRIPT START ---
+
+function onOpen() { setupSheetAndMenu(); }
+
+function setupSheetAndMenu() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('Automation Menu')
+      .addItem('Process New Files Now', 'processNewFiles')
+      .addSeparator()
+      .addItem('Generate Well-being Dashboard', 'createDashboard')
+      .addItem('Reset Sheet Headers', 'resetHeaders')
+      .addItem('Setup Notification Triggers', 'createSystemTriggers')
+      .addItem('Check Available AI Models', 'checkAvailableModels')
+      .addToUi();
+  } catch (e) {
+    console.warn("UI Menu creation skipped: Script is running in background context.");
+  }
+}
+
+function resetHeaders() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+  if (!sheet) return;
+  const headers = [
+    "Tracking Code", "Type of Deck", "Parent Company", "Brand", "Campaign/Project Name",
+    "Budget", "Strat", "Client Champion", "Industry or Internal",
+    "Status", "Proposal Link", "Deadline", "Summary Doc Link", 
+    "OG Brief Link 1", "OG Brief Link 2", "OG Brief Link 3", "OG Brief Link 4", "OG Brief Link 5", 
+    "Brief Score", "Missing Info", "Generated On?", "SLA Days", "SLA Target Date" 
+  ];
+  sheet.getRange(1, 1, 1, headers.length).clearContent();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+}
+
+/**
+ * -----------------------------------------------------------------------
+ * DASHBOARD GENERATOR V5: CENTERED & PADDED UI
+ * -----------------------------------------------------------------------
+ */
+function createDashboard() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let dashSheet = ss.getSheetByName(CONFIG.dashboardName);
+  
+  // Reset Dashboard
+  if (dashSheet) { ss.deleteSheet(dashSheet); }
+  dashSheet = ss.insertSheet(CONFIG.dashboardName, 0); 
+  
+  // Visual Setup
+  dashSheet.setHiddenGridlines(true);
+
+  // --- 1. GET DATA ---
+  const dataSheet = ss.getSheetByName(CONFIG.sheetName);
+  const data = dataSheet.getDataRange().getValues();
+  const headers = data.shift(); // Remove header row
+
+  // Data Structures
+  let activeProjects = [];   
+  let stratWeeks = {};       
+
+  // --- 2. CRUNCH THE NUMBERS ---
+  data.forEach(row => {
+    const strat = row[CONFIG.colIndices.strat - 1]; 
+    const status = String(row[CONFIG.colIndices.status - 1]).toLowerCase();
+    const brand = row[CONFIG.colIndices.brand - 1];
+    const project = row[CONFIG.colIndices.project - 1];
+    const deadline = row[CONFIG.colIndices.deadline - 1];
+
+    if (!strat || strat === "N/A" || status === "done" || status === "completed") return;
+
+    // A. Add to Active List
+    let deadlineStr = "N/A";
+    if (deadline instanceof Date) {
+      deadlineStr = Utilities.formatDate(deadline, Session.getScriptTimeZone(), "dd/MM");
+    }
+    activeProjects.push([strat, brand, project, deadlineStr]);
+
+    // B. Check for Weekly Overload
+    if (deadline instanceof Date) {
+      const weekNum = getWeekNumber(deadline);
+      const year = deadline.getFullYear();
+      const key = `${strat}_${year}_W${weekNum}`;
+
+      if (!stratWeeks[key]) stratWeeks[key] = [];
+      stratWeeks[key].push(deadlineStr);
+    }
+  });
+
+  // Sort Active Projects by Strategist Name
+  activeProjects.sort((a, b) => a[0].localeCompare(b[0]));
+
+  // --- 3. BUILD THE UI ---
+
+  // HEADER SECTION (Moved to Row 3 for top padding)
+  // Title
+  dashSheet.getRange("C3").setValue("❤️ Team Well-being Monitor").setFontSize(24).setFontWeight("bold");
+  dashSheet.getRange("C4").setValue(`Last Updated: ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd MMM HH:mm")}`);
+  
+  // Divider Line (Row 6)
+  dashSheet.getRange("B6:K6").setBorder(null, null, true, null, null, null, "black", SpreadsheetApp.BorderStyle.SOLID);
+
+  // ---------------------------------------------------------
+  // SECTION A: FULL ACTIVE LIST (Left Side: Col C-F)
+  // ---------------------------------------------------------
+  
+  // Header: Col C
+  dashSheet.getRange("C8").setValue("🔥 Active Brief List (Ongoing)")
+    .setFontSize(14).setFontWeight("bold");
+
+  const listHeaders = [["Strategist", "Brand", "Proposal", "Due Date"]];
+  
+  // Table Header (Row 9)
+  dashSheet.getRange("C9:F9").setValues(listHeaders)
+    .setFontWeight("bold")
+    .setBackground("#000000")
+    .setFontColor("#ffffff")
+    .setBorder(true, true, true, true, true, true)
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle");
+
+  // Populate Data (Row 10+)
+  let leftRows = 0;
+  if (activeProjects.length > 0) {
+    leftRows = activeProjects.length;
+    dashSheet.getRange(10, 3, leftRows, 4)
+      .setValues(activeProjects)
+      .setBorder(true, true, true, true, true, true)
+      .setHorizontalAlignment("center") // Center Text
+      .setVerticalAlignment("middle");  // Middle Align
+  } else {
+    dashSheet.getRange("C10").setValue("No active briefs!");
+    leftRows = 1;
+  }
+
+  // ---------------------------------------------------------
+  // SECTION B: OVERLOAD WATCH (Right Side: Col H-J)
+  // ---------------------------------------------------------
+  
+  // Header: Col H
+  dashSheet.getRange("H8").setValue("🚨 Overload Watch (>3 Decks/Week)")
+    .setFontSize(14).setFontWeight("bold").setFontColor("black");
+
+  const burnoutHeaders = [["Strategist", "Critical Dates (Deadlines)", "Count"]];
+  dashSheet.getRange("H9:J9").setValues(burnoutHeaders)
+    .setFontWeight("bold")
+    .setBackground("#ff0000") 
+    .setFontColor("#ffffff") 
+    .setBorder(true, true, true, true, true, true)
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle");
+
+  let alertRow = 10;
+  let riskFound = false;
+
+  for (const [key, dates] of Object.entries(stratWeeks)) {
+    if (dates.length > 3) {
+      const stratName = key.split('_')[0];
+      const datesList = dates.join(", "); 
+      
+      dashSheet.getRange(alertRow, 8).setValue(stratName);
+      dashSheet.getRange(alertRow, 9).setValue(datesList).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+      dashSheet.getRange(alertRow, 10).setValue(dates.length);
+      alertRow++;
+      riskFound = true;
+    }
+  }
+
+  let rightRows = alertRow - 10;
+  if (!riskFound) {
+    dashSheet.getRange(alertRow, 8).setValue("✅ No immediate burnout risks.");
+    rightRows = 1;
+  } else {
+    // Format Data Table
+    dashSheet.getRange(10, 8, rightRows, 3)
+      .setBorder(true, true, true, true, true, true)
+      .setHorizontalAlignment("center")
+      .setVerticalAlignment("middle");
+  }
+
+  // ---------------------------------------------------------
+  // SECTION C: THE CONTAINER BOX (PADDED)
+  // ---------------------------------------------------------
+  
+  // Max Height + Buffer
+  const maxTableHeight = Math.max(leftRows + 9, rightRows + 9) + 2; 
+  
+  // Container Range: B2 to K[maxTableHeight]
+  dashSheet.getRange(2, 2, maxTableHeight - 1, 10)
+    .setBorder(true, true, true, true, null, null, "black", SpreadsheetApp.BorderStyle.SOLID_THICK);
+
+  // ---------------------------------------------------------
+  // COLUMN SIZING (The Secret to the Spacing)
+  // ---------------------------------------------------------
+  dashSheet.setColumnWidth(1, 20);  // A: Sheet Margin
+  dashSheet.setColumnWidth(2, 25);  // B: CONTAINER LEFT PADDING
+  dashSheet.setColumnWidth(3, 120); // C: Strat (Left)
+  dashSheet.setColumnWidth(4, 120); // D: Brand
+  dashSheet.setColumnWidth(5, 250); // E: Proposal
+  dashSheet.setColumnWidth(6, 80);  // F: Due
+  dashSheet.setColumnWidth(7, 50);  // G: MIDDLE SPACER
+  dashSheet.setColumnWidth(8, 120); // H: Strat (Right)
+  dashSheet.setColumnWidth(9, 250); // I: Critical Dates
+  dashSheet.setColumnWidth(10, 60); // J: Count
+  dashSheet.setColumnWidth(11, 25); // K: CONTAINER RIGHT PADDING
+}
+
+// --- STANDARD AUTOMATION FUNCTIONS ---
+
+function calculateSLADays(type, budgetStr) {
+  const t = (type || "").toLowerCase();
+  let b = 0;
+  if (budgetStr) {
+    b = parseFloat(String(budgetStr).replace(/[^0-9.]/g, ''));
+  }
+  if (t.includes("topline")) return 1; 
+  if (t.includes("revision")) return 3; 
+  if (t.includes("brand plan") || t.includes("brand review")) return 10; 
+  if (t.includes("key learning")) return 5;
+  if (t.includes("case stud")) return 5;
+  if (t.includes("package")) return 14; 
+
+  if (b < 50000) return 2;       
+  if (b < 300000) return 4;      
+  if (b < 500000) return 7;      
+  if (b < 800000) return 8;      
+  return 12;                     
+}
+
+function createSystemTriggers() {
+  const existingTriggers = ScriptApp.getProjectTriggers();
+  let timeTriggerExists = false;
+  let editTriggerExists = false;
+
+  existingTriggers.forEach(t => {
+    if (t.getHandlerFunction() === 'processNewFiles') timeTriggerExists = true;
+    if (t.getHandlerFunction() === 'onStatusChange') editTriggerExists = true;
+  });
+
+  if (!timeTriggerExists) {
+    ScriptApp.newTrigger('processNewFiles').timeBased().everyMinutes(10).create();
+  }
+  
+  if (!editTriggerExists) {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet();
+    ScriptApp.newTrigger('onStatusChange').forSpreadsheet(sheet).onEdit().create();
+  }
+
+  try { SpreadsheetApp.getUi().alert('Success! All automation and notification triggers are set.'); } catch(e) {}
+}
+
+function getMention(name) {
+  if (!name) return "N/A";
+  const cleanName = String(name).trim();
+  return `*${cleanName}*`; 
+}
+
+function onStatusChange(e) {
+  if (!e || !e.range) return;
+  const sheet = e.range.getSheet();
+  if (sheet.getName() !== CONFIG.sheetName) return;
+
+  const colIndex = e.range.getColumn();
+  const rowIndex = e.range.getRow();
+  if (rowIndex <= 1) return;
+
+  const project = sheet.getRange(rowIndex, CONFIG.colIndices.project).getValue();
+  const brand = sheet.getRange(rowIndex, CONFIG.colIndices.brand).getValue(); 
+  const stratName = sheet.getRange(rowIndex, CONFIG.colIndices.strat).getValue();
+  const ccName = sheet.getRange(rowIndex, CONFIG.colIndices.cc).getValue();
+  const cellValue = e.value || e.range.getValue();
+  const newValue = String(cellValue).toLowerCase();
+
+  // 1. STATUS UPDATE
+  if (colIndex === CONFIG.colIndices.status) {
+    createDashboard(); 
+    if (newValue === "done" || newValue === "completed") {
+      const proposalLink = sheet.getRange(rowIndex, CONFIG.colIndices.proposalLink).getValue();
+      const proposalDisplay = proposalLink ? proposalLink : "N/A";
+      const message = `✅ *Proposal Completed*\n\n*Brand:* ${brand}\n*Strat:* ${getMention(stratName)} has marked the project as done.\n*Project:* ${project}\n*CC:* ${getMention(ccName)}\n*Proposal:* ${proposalDisplay}`;
+      sendWebhook(message);
+    }
+  }
+
+  // 2. STRAT HANDOVER
+  if (colIndex === CONFIG.colIndices.strat && cellValue) {
+    createDashboard(); 
+    const message = `🔄 *Strat Update / Handover*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Update:* ${getMention(cellValue)} has taken over this project.`;
+    sendWebhook(message);
+  }
+
+  // 3. DEADLINE CHANGE
+  if (colIndex === CONFIG.colIndices.deadline) {
+    createDashboard(); 
+    const newDeadline = e.range.getDisplayValue(); 
+    let oldDeadline = e.oldValue || "N/A"; 
+    if (oldDeadline !== "N/A" && !isNaN(oldDeadline) && Number(oldDeadline) > 20000) {
+      const serial = Number(oldDeadline);
+      const dateDate = new Date((serial - 25569) * 86400 * 1000);
+      oldDeadline = Utilities.formatDate(dateDate, Session.getScriptTimeZone(), "dd/MM/yyyy");
+    }
+    if (newDeadline) {
+      const message = `📅 *Deadline Updated*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Old Deadline:* ${oldDeadline}\n*New Deadline:* ${newDeadline}\n\n*CC:* ${getMention(ccName)}\n*Strat:* ${getMention(stratName)}`;
+      sendWebhook(message);
+    }
+  }
+
+  // 4. NEW FILE ADDED
+  if (colIndex >= CONFIG.colIndices.linkStart && colIndex <= CONFIG.colIndices.linkEnd && cellValue) {
+    const message = `📂 *Additional File Added*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Update:* Additional brief documents have been added.\n\n*CC:* ${getMention(ccName)}\n*Strat:* ${getMention(stratName)} please review.`;
+    sendWebhook(message);
+  }
+}
+
+function sendWebhook(text) {
+  if (!CONFIG.webhookUrl || CONFIG.webhookUrl.includes("PASTE_YOUR")) {
+    Logger.log("Webhook URL not set.");
+    return;
+  }
+  const payload = JSON.stringify({ "text": text });
+  const options = { 'method': 'post', 'contentType': 'application/json', 'payload': payload, 'muteHttpExceptions': true };
+  try { UrlFetchApp.fetch(CONFIG.webhookUrl, options); } catch (e) { Logger.log("Webhook failed: " + e.toString()); }
+}
+
+// ... PROCESS FILES LOGIC ...
+
+function processNewFiles() {
+  const newFilesFolder = DriveApp.getFolderById(CONFIG.newFilesFolderId);
+  const archiveFolder = DriveApp.getFolderById(CONFIG.archiveFolderId);
+  const summaryFolder = DriveApp.getFolderById(CONFIG.summaryDocsFolderId);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+  
+  let workDone = false;
+  const files = newFilesFolder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    processItem(file, sheet, archiveFolder, summaryFolder, false);
+    workDone = true;
+  }
+
+  const subFolders = newFilesFolder.getFolders();
+  while (subFolders.hasNext()) {
+    const folder = subFolders.next();
+    
+    // SAFETY LOCK: DO NOT ENTER ARCHIVE OR SUMMARY FOLDERS
+    if (folder.getId() === CONFIG.archiveFolderId || folder.getId() === CONFIG.summaryDocsFolderId) {
+      Logger.log(`[SAFETY] Skipping Protected Folder: ${folder.getName()}`);
+      continue;
+    }
+
+    processItem(folder, sheet, archiveFolder, summaryFolder, true);
+    workDone = true;
+  }
+
+  if (workDone) {
+    createDashboard();
+    Logger.log("Dashboard updated after new files.");
+  }
+}
+
+function processItem(item, sheet, archiveFolder, summaryFolder, isFolder) {
+  const name = item.getName();
+  
+  // STRICT NAMING CHECK (4 Underscores required)
+  if (!isValidNamingConvention(name)) {
+    Logger.log(`[SKIP] Ignored (Strict Mode): ${name}`);
+    return;
+  }
+
+  Logger.log(`Processing: ${name}`);
+  const fileNameData = parseFilenameMetadata(name); // Parse Metadata FIRST
+  
+  let text = "";
+  let fileLinks = ["", "", "", "", ""];
+  let filesCount = 0;
+
+  if (isFolder) {
+    const folderFiles = item.getFiles();
+    let i = 0;
+    while (folderFiles.hasNext()) {
+      const f = folderFiles.next();
+      if (i < 5) fileLinks[i] = `=HYPERLINK("${f.getUrl()}", "📂 Open File")`;
+      let extracted = extractTextSmartly(f);
+      if (extracted) text += `\n\n--- FILE: ${f.getName()} ---\n${extracted}\n`;
+      i++;
+      filesCount++;
+      Utilities.sleep(1000);
+    }
+    if (filesCount === 0) return; 
+  } else {
+    text = extractTextSmartly(item);
+    fileLinks[0] = `=HYPERLINK("${item.getUrl()}", "📂 Open File")`;
+  }
+
+  if (text) {
+    let aiData = getAiDataWithFallback(text, fileNameData);
+    if (aiData) {
+      const trackingCode = generateTrackingCode();
+      const summaryDoc = createSummaryDoc(aiData, trackingCode, summaryFolder, `Source: ${name}`);
+      const summaryLink = `=HYPERLINK("${summaryDoc.getUrl()}", "📄 View Summary")`;
+
+      appendDataToSheet(sheet, trackingCode, fileNameData, aiData, summaryLink, fileLinks);
+      
+      let scoreEmoji = aiData.briefScore >= 7 ? "🟢" : (aiData.briefScore >= 5 ? "🟡" : "🔴");
+      let budgetDisplay = fileNameData.budget ? `RM ${fileNameData.budget}` : "N/A";
+
+      const notifyMsg = `🚀 *New Brief Uploaded*\n\n*Brand:* ${aiData.brand}\n*Project:* ${aiData.campaignName}\n*Budget:* ${budgetDisplay}\n*Score:* ${scoreEmoji} ${aiData.briefScore}/10\n*Missing:* ${aiData.missingInfo || "None"}\n\n*CC:* ${getMention(fileNameData.clientChampion)}\n*Strat:* ${getMention(fileNameData.strat)}`;
+      sendWebhook(notifyMsg);
+
+      if (isFolder) moveFolderToArchive(item, archiveFolder);
+      else item.moveTo(archiveFolder);
+    }
+  }
+}
+
+// ... HELPERS ...
+
+function extractTextSmartly(file) {
+  const mimeType = file.getMimeType();
+  if (mimeType === 'message/rfc822' || mimeType.startsWith('text/')) {
+    return file.getBlob().getDataAsString();
+  }
+  return performRobustOCR(file);
+}
+
+function parseFilenameMetadata(fileName) {
+  const parts = fileName.split('_');
+  const rawDate = parts.length > 4 ? parts.slice(4).join('_').trim() : "";
+  let dateObj = rawDate;
+  if (rawDate) {
+    const dateParts = rawDate.split('/'); 
+    if (dateParts.length === 3) dateObj = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+  }
+  return {
+      clientChampion: parts.length > 0 ? parts[0].trim() : "N/A",
+      strat:          parts.length > 1 ? parts[1].trim() : "N/A",
+      budget:         parts.length > 2 ? parts[2].trim() : "",
+      typeOfDeck:     parts.length > 3 ? parts[3].trim() : "N/A",
+      deadline:       dateObj 
+  };
+}
+
+function createSummaryDoc(aiData, trackingCode, folder, sourceInfo) {
+  const summaryDoc = DocumentApp.create(`${trackingCode} - ${aiData.campaignName || 'Untitled'} - Summary`);
+  const summaryDocFile = DriveApp.getFileById(summaryDoc.getId());
+  folder.addFile(summaryDocFile);
+  DriveApp.getRootFolder().removeFile(summaryDocFile);
+  
+  const body = summaryDoc.getBody();
+  addSection(body, "Metadata", sourceInfo);
+  
+  body.appendParagraph(`Brief Quality Score: ${aiData.briefScore}/10`).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  if (aiData.missingInfo && aiData.missingInfo !== "None") {
+    body.appendParagraph(`⚠️ Missing Info: ${aiData.missingInfo}`).setForegroundColor("#FF0000");
+  }
+
+  addSection(body, "Core Brief Requirements", aiData.summary_brief);
+  addSection(body, "Timeline & Period", aiData.summary_campaignPeriod);
+  addSection(body, "Target Audience", aiData.summary_targetAudience);
+  addSection(body, "Key Deliverables", aiData.summary_campaignDetails);
+  addSection(body, "Mandatory Inclusions", aiData.summary_buzzIdeas);
+  addSection(body, "Budget Breakdown", aiData.summary_budget);
+  
+  return summaryDoc;
+}
+
+function appendDataToSheet(sheet, trackingCode, fileNameData, aiData, summaryLink, fileLinksArray) {
+  const lastRow = sheet.getLastRow() + 1;
+  const slaDays = calculateSLADays(fileNameData.typeOfDeck, fileNameData.budget);
+  const slaDateFormula = `=WORKDAY(U${lastRow}, ${slaDays})`;
+
+  let missingInfoClean = aiData.missingInfo;
+  if (Array.isArray(missingInfoClean)) {
+    missingInfoClean = missingInfoClean.join(", ");
+  } else if (typeof missingInfoClean === 'object') {
+    missingInfoClean = JSON.stringify(missingInfoClean).replace(/"/g, '').replace(/[[\]{}]/g, '');
+  }
+
+  sheet.appendRow([
+    trackingCode, 
+    fileNameData.typeOfDeck, 
+    aiData.parentCompany || "N/A", 
+    aiData.brand || "N/A", 
+    aiData.campaignName || "N/A", 
+    fileNameData.budget,           
+    fileNameData.strat, 
+    fileNameData.clientChampion, 
+    aiData.industryOrInternal || "N/A", 
+    "", "", 
+    fileNameData.deadline, 
+    summaryLink,
+    fileLinksArray[0], fileLinksArray[1], fileLinksArray[2], fileLinksArray[3], fileLinksArray[4], 
+    aiData.briefScore, 
+    missingInfoClean, 
+    new Date(),
+    slaDays, 
+    slaDateFormula 
+  ]);
+  sheet.getRange(lastRow, 6).setNumberFormat('"RM" #,##0.00'); 
+  sheet.getRange(lastRow, 12).setNumberFormat('dd/mm/yyyy');
+  sheet.getRange(lastRow, 23).setNumberFormat('dd/mm/yyyy');
+}
+
+function moveFolderToArchive(sourceFolder, targetParentFolder) {
+  const newFolder = targetParentFolder.createFolder(sourceFolder.getName());
+  const files = sourceFolder.getFiles();
+  while (files.hasNext()) { files.next().moveTo(newFolder); }
+  const subFolders = sourceFolder.getFolders();
+  while (subFolders.hasNext()) { moveFolderToArchive(subFolders.next(), newFolder); }
+  sourceFolder.setTrashed(true);
+}
+
+function addSection(body, title, content) {
+  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  let textToWrite = 'N/A';
+  if (content) {
+    if (Array.isArray(content)) {
+      textToWrite = content.map(item => {
+        if (typeof item === 'object' && item !== null) return Object.values(item).join(' - ');
+        return String(item);
+      }).join('\n');
+    } else if (typeof content === 'object') {
+      textToWrite = JSON.stringify(content, null, 2);
+    } else {
+      textToWrite = String(content);
+    }
+  }
+  body.appendParagraph(textToWrite);
+}
+
+function performRobustOCR(file) {
+  let attempts = 0;
+  while (attempts < 3) {
+    let tempDocId = null;
+    try {
+      const fileBlob = file.getBlob();
+      const resource = { title: `[TEMP OCR] ${file.getName()}`, mimeType: fileBlob.getContentType() };
+      const tempDocFile = Drive.Files.insert(resource, fileBlob, { ocr: true });
+      tempDocId = tempDocFile.id;
+      const text = DocumentApp.openById(tempDocId).getBody().getText();
+      DriveApp.getFileById(tempDocId).setTrashed(true);
+      return text; 
+    } catch (e) {
+      if (tempDocId) try { DriveApp.getFileById(tempDocId).setTrashed(true); } catch(err){}
+      if (e.toString().includes("rate limit")) {
+        attempts++;
+        Utilities.sleep(attempts * 5000); 
+      } else {
+        return null; 
+      }
+    }
+  }
+  return null;
+}
+
+function getAiDataWithFallback(fileContent, metadata) {
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  const models = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`
+  ];
+
+  let deadlineStr = "Unknown";
+  if (metadata.deadline instanceof Date) {
+    deadlineStr = Utilities.formatDate(metadata.deadline, Session.getScriptTimeZone(), "dd/MM/yyyy");
+  }
+
+  const prompt = `
+    You are an expert Strategic Planner performing a "Brief Audit".
+    Analyze the provided project documents. 
+    
+    CONTEXT FROM FILENAME:
+    - Budget: ${metadata.budget || "Unknown"}
+    - Deadline: ${deadlineStr}
+    - CC: ${metadata.clientChampion}
+    - Strat: ${metadata.strat}
+    
+    1. EXTRACT key information.
+    2. GRADE the brief quality (1-10).
+    3. IDENTIFY missing info.
+    
+    Return ONLY a JSON object:
+    "brand", "campaignName", "parentCompany", "industryOrInternal", "summary_brief", "summary_campaignPeriod", "summary_targetAudience", "summary_campaignDetails", "summary_buzzIdeas", "summary_budget", "briefScore", "missingInfo".
+    
+    IMPORTANT FORMATTING:
+    - Retain the exact casing for "brand" and "parentCompany" as they appear in the text (e.g., "BSN", "foodpanda", "Samsung"). Do NOT force Title Case.
+    
+    TEXT TO ANALYZE:
+    ${fileContent.substring(0, 80000)} 
+  `;
+  
+  const payload = JSON.stringify({ "contents": [{ "parts": [{ "text": prompt }] }] });
+  const options = { 'method': 'post', 'contentType': 'application/json', 'payload': payload, 'muteHttpExceptions': true };
+
+  for (const url of models) {
+    try {
+      const response = UrlFetchApp.fetch(url, options);
+      if (response.getResponseCode() === 200) {
+        const json = JSON.parse(response.getContentText());
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
+          let data = JSON.parse(cleanJson);
+          
+          const badNames = ["N/A", "Not Specified", "Not specified", "Untitled", "Unknown", "TBD"];
+          if (!data.campaignName || badNames.includes(data.campaignName) || data.campaignName.trim() === "") {
+             data.campaignName = `Proposal For ${data.brand || "Client"}`;
+          }
+
+          if ((!data.summary_budget || data.summary_budget === "N/A" || data.summary_budget === "Not specified") && metadata.budget) {
+             data.summary_budget = `RM ${metadata.budget} (Sourced from filename)`;
+          }
+
+          if (Array.isArray(data.missingInfo)) {
+             data.missingInfo = data.missingInfo.join(", ");
+          } else if (typeof data.missingInfo === 'object') {
+             data.missingInfo = JSON.stringify(data.missingInfo).replace(/"/g, '').replace(/[[\]{}]/g, '');
+          }
+
+          return data;
+        }
+      }
+    } catch (e) { Logger.log(`Model Error: ${e.toString()}`); }
+  }
+  return null;
+}
+
+function generateTrackingCode() {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const now = new Date();
+  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const datePrefix = months[now.getMonth()] + String(now.getDate()).padStart(2, '0');
+  const lastDate = scriptProperties.getProperty('tracking_lastDate');
+  let sequence = (lastDate !== datePrefix) ? 'A' : incrementString(scriptProperties.getProperty('tracking_sequence') || 'A');
+  scriptProperties.setProperties({ 'tracking_lastDate': datePrefix, 'tracking_sequence': sequence });
+  return datePrefix + sequence;
+}
+
+function incrementString(str) {
+  let carry = 1, result = '';
+  for (let i = str.length - 1; i >= 0; i--) {
+    let charCode = str.charCodeAt(i) + carry;
+    carry = 0;
+    if (charCode > 90) { charCode = 65; carry = 1; }
+    result = String.fromCharCode(charCode) + result;
+  }
+  return (carry > 0 ? 'A' : '') + result;
+}
+
+function isValidNamingConvention(name) {
+  if (name.startsWith("~$")) return false; 
+  const parts = name.split('_');
+  return parts.length >= 5;
+}
+
+function checkAvailableModels() {
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!API_KEY) { Logger.log("FATAL ERROR: GEMINI_API_KEY not found."); return; }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
+  try {
+    const response = UrlFetchApp.fetch(url, { 'method': 'get', 'muteHttpExceptions': true });
+    Logger.log(response.getContentText());
+  } catch (e) { Logger.log(e.toString()); }
+}
+
+function getWeekNumber(d) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  var weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+  return weekNo;
+}
