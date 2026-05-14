@@ -1,0 +1,10 @@
+// Update these to match the column numbers in your Campaign Performance Sheet (A=1, B=2, etc.)
+  perfColIndices: {
+    code: 1,         // Column containing MAY26007A, etc.
+    campaignName: 3, // UPDATE THIS: Column containing the Campaign Name text
+    gross: 12,        // Column containing Gross Revenue
+    net: 13,          // Column containing Net Revenue
+    start: 14,        // Column containing Start Date
+    end: 15,          // Column containing End Date
+    progress: 6,     // Column containing Progress %
+    ioLink: 32       // Column AF containing Signed IO Smart Chips
