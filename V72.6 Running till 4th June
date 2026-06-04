@@ -1,0 +1,1328 @@
+/**
+ * -----------------------------------------------------------------------
+ * COMPLETE GOOGLE DRIVE & GEMINI AUTOMATION SCRIPT (V72.6)
+ * -----------------------------------------------------------------------
+ * Updates:
+ * 1. FIXED: TypeError "reading length of null" when processing complex Docx files.
+ * 2. Added safety checks to text extraction to prevent crashes on unreadable files.
+ * 3. Preserved User Directory and GChat Mentions.
+ * 4. Added full Sales Team to User Directory with placeholders.
+ * 5. Added OG Brief Link 1 to the New Brief Uploaded webhook notification.
+ * 6. NEW: Automated 1-on-1 Overdue Email Reminders to Strategists.
+ * 7. NEW: Automated Monthly & Annual Executive Report Emails.
+ * 8. NEW: Cross-sheet Campaign Performance Fetcher (Base Code Aggregation).
+ * 9. FIXED: Revenue data pulling as 0 due to formatting and comma parsing.
+ * 10. FIXED: Average Progress percentage calculating incorrectly.
+ * 11. NEW (V72.6): Custom date parser to fix "dd-MMM-yy" N/A errors and pull Min/Max dates.
+ * 12. NEW (V72.6): Smart chip URL extraction for Signed IO Links (Column AF).
+ * 13. NEW (V72.6): Proposal Link carry-over into the Signed Campaigns sheet.
+ * 14. NEW (V72.6): "Longest Common Prefix" smart cleaner for Campaign Names.
+ * 15. FIXED (V72.6): Stricter Base Code matching to prevent revenue miscalculations.
+ * 16. FIXED (V72.6.1): Memory Optimization to prevent V8 Engine Crash when reading Smart Chips.
+ * -----------------------------------------------------------------------
+ */
+
+// --- 1. CONFIGURATION ---
+const CONFIG = {
+  // YOUR INTEGRATED FOLDER IDS
+  newFilesFolderId: "1s38bsuQmoFwegyadmSypA5yryXRmcQt_", 
+  archiveFolderId: "1V84LSzqtreZveMFiNyvyGXM7JFHM1cYx", 
+  summaryDocsFolderId: "1WoUhjP7QzZuExCYx2NKe1j2dam-AyG3n",
+  
+  sheetName: "2025/2026 Work List",
+  dashboardName: "📊 Dashboard",
+  signedCampaignsSheetName: "Signed Campaigns",
+  
+  // BATCH CONTROL
+  maxBatchSize: 5, 
+  
+  // YOUR INTEGRATED WEBHOOK
+  webhookUrl: "https://chat.googleapis.com/v1/spaces/AAQAUePtDcU/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=RJOGrkudFK7noz6yMT37RWG0JX1XkDQFUZc5bS5ajqM",
+  
+  // LEADERSHIP EMAILS FOR MONTHLY/ANNUAL REPORTS
+  leadershipEmails: "khaikit.ko@revmedia.my, ledwina@revmedia.my, nadiah@revmedia.my, iylia@revmedia.my, amirudin.yusof@revmedia.my, chris@mediaprima.com.my",
+  
+  // EXTERNAL CAMPAIGN PERFORMANCE SHEET INTEGRATION
+  campaignPerformanceSheetId: "1RQDGd4h5Y2aBiH_lFX7IVQAiQoscbhq8I1x51ORycmM",
+  
+  // Update these to match the column numbers in your Campaign Performance Sheet (A=1, B=2, etc.)
+  perfColIndices: {
+    code: 1,         // Column containing MAY26007A, etc.
+    campaignName: 3, // UPDATE THIS: Column containing the Campaign Name text
+    gross: 12,        // Column containing Gross Revenue
+    net: 13,          // Column containing Net Revenue
+    start: 14,        // Column containing Start Date
+    end: 15,          // Column containing End Date
+    progress: 6,     // Column containing Progress %
+    ioLink: 32       // Column AF containing Signed IO Smart Chips
+  },
+
+  // Column Indexes for the Strategy Work List (A=1, B=2, etc.)
+  colIndices: {
+    brand: 4,        // Column D
+    project: 5,      // Column E
+    strat: 7,        // Column G
+    cc: 8,           // Column H
+    status: 10,      // Column J
+    proposalLink: 11,// Column K
+    deadline: 12,    // Column L
+    linkStart: 15,   // Column O
+    linkEnd: 18,     // Column R
+    baseCodeEntry: 25// Column Y (Where Strategists type the base code)
+  }
+};
+
+// --- 2. USER DIRECTORY (THE PHONEBOOK) ---
+const USER_DIRECTORY = {
+  // --- STRATEGISTS ---
+  "Farukh": "110070710940996950877",
+  "Harisha": "111385111641142940129",
+  "Keith": "105703173630690236612", 
+  "Yaya": "107259908827879014249",  
+  "Pritib": "116355202467232844773",
+  "Natalie": "100796960278726320380",
+  "Suresh": "118052905870960991802",
+  "Iman": "118174901450192637222",
+  "Annette": "107802343903673852647",
+  "Dan": "118364510046441204337",
+  "Nadiah": "112750659531775949759",
+  "Ellysa": "105547194415208405405",
+  "Min": "102242529834194730600",
+  "Farah": "104706912073437698703", 
+  "Iylia": "114830409590870439493", 
+  "Rudy": "104391518090291327768", 
+  "Leddy": "107530898310568356566",
+  
+  // --- SALES TEAM ---
+  "Abigail": "103399077618390873623",
+  "Alex": "106026524839419670129",
+  "Aqilah": "115243190324081969605",
+  "Chloe": "101381890440248873922",
+  "Doreen": "109323518588493993591",
+  "Edwin": "104758072652423521744",
+  "Emmely": "110261638241650760130",
+  "Fiza": "115145774920919934105",
+  "Jade": "111617926917363072605",
+  "Janis": "115771782111838137631",
+  "Jennifer": "PLACEHOLDER_ID",
+  "Jia Hui": "108360292514089178088",
+  "Julie": "110540660742451372597",
+  "Justin": "102874877738637596750",
+  "Malini": "108192035067291106204",
+  "Chelle": "111832964381447517675",
+  "Kean": "104213448997349676041",
+  "Prasna": "111657824785802529394",
+  "Saiful": "102156516511708068655",
+  "Sarah": "118264663645362532326",
+  "Seng Sin": "111300083791320536534",
+  "Shu Yee": "100646652793770045888",
+  "Yik Wen": "105703173630690236612",
+  "Haseef": "115738155818943492524",
+  "Rachel": "109677204007410032462",
+  "Jayne": "111086247861110697249"
+};
+
+// --- 2.1 STRATEGIST EMAIL DIRECTORY (FOR OVERDUE ALERTS) ---
+const STRAT_EMAILS = {
+  "Farukh": "farukh.razak@revmedia.my",
+  "Harisha": "harishavini@revmedia.my",
+  "Keith": "khaikit.ko@revmedia.my",
+  "Yaya": "eiyrea.natassha@revmedia.my",
+  "Pritib": "pritib.jacob@revmedia.my ",
+  "Natalie": "natalie.ng@revmedia.my",
+  "Suresh": "suresh@revmedia.my",
+  "Iman": "imansofea@revmedia.my",
+  "Annette": "annette.tew@revmedia.my",
+  "Dan": "danesh@revmedia.my",
+  "Nadiah": "nadiah@revmedia.my",
+  "Ellysa": "ellysa.azhar@revmedia.my",
+  "Min": "muhaimin.amran@revmedia.my",
+  "Farah": "farah.shapuri@revmedia.my",
+  "Iylia": "iylia@revmedia.my",
+  "Rudy": "amirudin.yusof@revmedia.my",
+  "Leddy": "ledwina@revmedia.my"
+};
+
+// --- SCRIPT START ---
+
+function onOpen() { setupSheetAndMenu(); }
+
+function setupSheetAndMenu() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('Automation Menu')
+      .addItem('Process New Files Now', 'processNewFiles')
+      .addSeparator()
+      .addItem('Generate Well-being Dashboard', 'createDashboard')
+      .addItem('📩 Send Monthly Report (Test)', 'testMonthlyReport')
+      .addItem('📩 Send Annual Report (Test)', 'testAnnualReport')
+      .addItem('🔧 Test AI Connection', 'checkAvailableModels')
+      .addItem('Reset Sheet Headers', 'resetHeaders')
+      .addItem('Setup Notification Triggers', 'createSystemTriggers')
+      .addToUi();
+  } catch (e) {
+    console.warn("UI Menu creation skipped: Script is running in background context.");
+  }
+}
+
+function testMonthlyReport() { sendMonthlyExecutiveReport(true); }
+function testAnnualReport() { sendAnnualExecutiveReport(true); }
+
+function resetHeaders() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert(`Error: Sheet "${CONFIG.sheetName}" not found. Please rename your tab.`);
+    return;
+  }
+  const headers = [
+    "Tracking Code", "Type of Deck", "Parent Company", "Brand", "Campaign/Project Name",
+    "Budget", "Strat", "Client Champion", "Industry or Internal",
+    "Status", "Proposal Link", "Deadline", "Summary Doc Link", 
+    "OG Brief Link 1", "OG Brief Link 2", "OG Brief Link 3", "OG Brief Link 4", "OG Brief Link 5", 
+    "Brief Score", "Missing Info", "Generated On?", "SLA Days", "SLA Target Date", "", "Signed Campaign Base Code"
+  ];
+  sheet.getRange(1, 1, 1, headers.length).clearContent();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+}
+
+/**
+ * -----------------------------------------------------------------------
+ * DASHBOARD GENERATOR
+ * -----------------------------------------------------------------------
+ */
+function createDashboard() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let dashSheet = ss.getSheetByName(CONFIG.dashboardName);
+  
+  if (dashSheet) { ss.deleteSheet(dashSheet); }
+  dashSheet = ss.insertSheet(CONFIG.dashboardName, 0); 
+  dashSheet.setHiddenGridlines(true);
+
+  // --- 1. GET DATA ---
+  const dataSheet = ss.getSheetByName(CONFIG.sheetName);
+  if (!dataSheet) return; 
+  const data = dataSheet.getDataRange().getValues();
+  const headers = data.shift(); 
+
+  // Data Structures
+  let activeProjects = [];   
+  let stratWeeks = {}; 
+  let stratTotalCounts = {};
+  let allStrats = new Set(); 
+
+  // --- 2. CRUNCH THE NUMBERS ---
+  data.forEach(row => {
+    const strat = row[CONFIG.colIndices.strat - 1]; 
+    const status = String(row[CONFIG.colIndices.status - 1]).toLowerCase();
+    const brand = row[CONFIG.colIndices.brand - 1];
+    const project = row[CONFIG.colIndices.project - 1];
+    const deadline = row[CONFIG.colIndices.deadline - 1];
+
+    if (!strat || strat === "N/A" || status === "done" || status === "completed") return;
+
+    allStrats.add(strat); 
+
+    // Count Total Active Load
+    if (!stratTotalCounts[strat]) stratTotalCounts[strat] = 0;
+    stratTotalCounts[strat]++;
+
+    let deadlineStr = "N/A";
+    if (deadline instanceof Date) {
+      deadlineStr = Utilities.formatDate(deadline, Session.getScriptTimeZone(), "dd/MM");
+    }
+    activeProjects.push([strat, brand, project, deadlineStr]);
+
+    if (deadline instanceof Date) {
+      const weekNum = getWeekNumber(deadline);
+      const year = deadline.getFullYear();
+      const weekKey = `${year} W${weekNum}`; 
+
+      if (!stratWeeks[weekKey]) stratWeeks[weekKey] = {};
+      if (!stratWeeks[weekKey][strat]) stratWeeks[weekKey][strat] = [];
+      
+      stratWeeks[weekKey][strat].push(deadlineStr);
+    }
+  });
+
+  activeProjects.sort((a, b) => a[0].localeCompare(b[0]));
+
+  // --- 3. BUILD THE UI ---
+  dashSheet.getRange("C3").setValue("❤️ Team Well-being Monitor").setFontSize(24).setFontWeight("bold");
+  dashSheet.getRange("C4").setValue(`Last Updated: ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd MMM HH:mm")}`);
+
+  // DIVIDER LINE
+  dashSheet.getRange("B6:L6").setBorder(null, null, true, null, null, null, "black", SpreadsheetApp.BorderStyle.SOLID);
+
+  // ---------------------------------------------------------
+  // SECTION A: FULL ACTIVE LIST
+  // ---------------------------------------------------------
+  dashSheet.getRange("C8").setValue("🔥 Active Brief List (Ongoing)").setFontSize(14).setFontWeight("bold");
+  const listHeaders = [["Strategist", "Brand", "Proposal", "Due Date"]];
+  dashSheet.getRange("C9:F9").setValues(listHeaders)
+    .setFontWeight("bold").setBackground("#000000").setFontColor("#ffffff")
+    .setBorder(true, true, true, true, true, true)
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+
+  let leftRows = 0;
+  if (activeProjects.length > 0) {
+    leftRows = activeProjects.length;
+    dashSheet.getRange(10, 3, leftRows, 4).setValues(activeProjects)
+      .setBorder(true, true, true, true, true, true)
+      .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  } else {
+    dashSheet.getRange("C10").setValue("No active briefs!");
+    leftRows = 1;
+  }
+
+  // ---------------------------------------------------------
+  // SECTION B: OVERLOAD WATCH
+  // ---------------------------------------------------------
+  dashSheet.getRange("H8").setValue("🚨 Overload Watch (>3 Decks/Week)").setFontSize(14).setFontWeight("bold").setFontColor("black");
+  
+  dashSheet.getRange("H9").setValue("Strategist");
+  dashSheet.getRange("I9:J9").merge().setValue("Critical Dates (Deadlines)"); 
+  dashSheet.getRange("K9").setValue("Count"); 
+
+  dashSheet.getRange("H9:K9")
+    .setFontWeight("bold").setBackground("#ff0000").setFontColor("#ffffff")
+    .setBorder(true, true, true, true, true, true)
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+
+  let alertRow = 10;
+  let riskFound = false;
+  let suggestions = [];
+
+  // Track how many times someone has already been suggested
+  let assignedReliefCounts = {};
+
+  // Identify Overloads
+  for (const [weekKey, stratsInWeek] of Object.entries(stratWeeks)) {
+    for (const [stratName, dates] of Object.entries(stratsInWeek)) {
+      if (dates.length > 3) {
+        
+        // 1. Populate Red Table
+        const datesList = dates.join(", ");
+        dashSheet.getRange(alertRow, 8).setValue(stratName);
+        dashSheet.getRange(alertRow, 9, 1, 2).merge().setValue(datesList).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+        dashSheet.getRange(alertRow, 11).setValue(dates.length);
+        alertRow++;
+        riskFound = true;
+
+        // 2. Find Relief Strategist (FAIR DISTRIBUTION)
+        let bestCandidate = "None";
+        let lowestEffectiveLoad = 99; // Tracks (Real Load + Already Assigned)
+        let lowestTotalBacklog = 99;
+        let candidateDeadlines = "";
+        let foundAnyone = false;
+
+        allStrats.forEach(candidate => {
+          if (candidate === stratName) return; 
+          
+          // Calculate Real Load
+          let realWeeklyLoad = 0;
+          let activeDates = [];
+          if (stratWeeks[weekKey] && stratWeeks[weekKey][candidate]) {
+             activeDates = stratWeeks[weekKey][candidate];
+             realWeeklyLoad = activeDates.length;
+          }
+
+          // Calculate "Effective Load" (Real + Already Assigned to help others)
+          let assignedCount = assignedReliefCounts[candidate] || 0;
+          let effectiveWeeklyLoad = realWeeklyLoad + assignedCount;
+
+          let totalLoad = stratTotalCounts[candidate] || 0; 
+      
+          // Must have < 3 decks (Effectively) to be considered
+          if (effectiveWeeklyLoad < 3) {
+             foundAnyone = true;
+             
+             let isBetterCandidate = false;
+
+             // Logic: Compare Effective Load (includes pending assignments)
+             if (effectiveWeeklyLoad < lowestEffectiveLoad) {
+               isBetterCandidate = true;
+             } else if (effectiveWeeklyLoad === lowestEffectiveLoad) {
+               // Tie-breaker: Total Backlog
+               if (totalLoad < lowestTotalBacklog) {
+                 isBetterCandidate = true;
+               }
+             }
+
+             if (isBetterCandidate) {
+                lowestEffectiveLoad = effectiveWeeklyLoad;
+                lowestTotalBacklog = totalLoad;
+                bestCandidate = candidate;
+                
+                // Formatting the display string
+                let statusText = (realWeeklyLoad === 0) ? "Free this wk" : `Busy: ${activeDates.join(", ")}`;
+                if (assignedCount > 0) statusText += ` (+${assignedCount} helping)`;
+                candidateDeadlines = `Total Active: ${totalLoad} (${statusText})`;
+             }
+          }
+        });
+
+        if (!foundAnyone) {
+           bestCandidate = "⚠️ NO ONE AVAILABLE";
+           candidateDeadlines = "All strats saturated";
+        } else {
+           // Increment the counter for the chosen candidate so they aren't picked again immediately
+           assignedReliefCounts[bestCandidate] = (assignedReliefCounts[bestCandidate] || 0) + 1;
+        }
+
+        suggestions.push([stratName, weekKey, bestCandidate, candidateDeadlines]);
+      }
+    }
+  }
+
+  let rightRows = alertRow - 10;
+  if (!riskFound) {
+    dashSheet.getRange(alertRow, 8).setValue("✅ No immediate burnout risks.");
+    rightRows = 1;
+  } else {
+    dashSheet.getRange(10, 8, rightRows, 4).setBorder(true, true, true, true, true, true)
+      .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  }
+
+  // ---------------------------------------------------------
+  // SECTION C: WORKLOAD RELIEF
+  // ---------------------------------------------------------
+  let suggestStartRow = alertRow + 2;
+  if (suggestions.length > 0) {
+    dashSheet.getRange(suggestStartRow, 8).setValue("📉 Workload Relief Suggestions")
+      .setFontSize(14).setFontWeight("bold").setFontColor("black");
+    const suggestHeaders = [["Overloaded", "Week", "Suggested Strat", "Strat's Current Load"]];
+    dashSheet.getRange(suggestStartRow + 1, 8, 1, 4).setValues(suggestHeaders)
+      .setFontWeight("bold").setBackground("#0b5394") // Dark Blue
+      .setFontColor("#ffffff")
+      .setBorder(true, true, true, true, true, true)
+      .setHorizontalAlignment("center").setVerticalAlignment("middle");
+    dashSheet.getRange(suggestStartRow + 2, 8, suggestions.length, 4).setValues(suggestions)
+      .setBorder(true, true, true, true, true, true)
+      .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  }
+
+  // ---------------------------------------------------------
+  // SECTION D: THE CONTAINER
+  // ---------------------------------------------------------
+  
+  let totalRightHeight = rightRows + 9;
+  if (suggestions.length > 0) {
+     totalRightHeight = suggestStartRow + suggestions.length + 3;
+  }
+
+  const maxTableHeight = Math.max(leftRows + 9, totalRightHeight) + 1;
+  // Draw Border B2 to L
+  dashSheet.getRange(2, 2, maxTableHeight - 1, 11) 
+    .setBorder(true, true, true, true, null, null, "black", SpreadsheetApp.BorderStyle.SOLID_THICK);
+
+  // ---------------------------------------------------------
+  // COLUMN SIZING
+  // ---------------------------------------------------------
+  dashSheet.setColumnWidth(1, 20);  // A
+  dashSheet.setColumnWidth(2, 25);  // B
+  dashSheet.setColumnWidth(3, 120); // C
+  dashSheet.setColumnWidth(4, 120); // D
+  dashSheet.setColumnWidth(5, 250); // E
+  dashSheet.setColumnWidth(6, 80);  // F
+  dashSheet.setColumnWidth(7, 30);  // G
+  dashSheet.setColumnWidth(8, 120); // H
+  dashSheet.setColumnWidth(9, 150); // I
+  dashSheet.setColumnWidth(10, 150);// J
+  dashSheet.setColumnWidth(11, 200); // K
+  dashSheet.setColumnWidth(12, 25);  // L
+}
+
+// --- STANDARD AUTOMATION FUNCTIONS ---
+
+function calculateSLADays(type, budgetStr) {
+  const t = (type || "").toLowerCase();
+  let b = 0;
+  if (budgetStr) {
+    b = parseFloat(String(budgetStr).replace(/[^0-9.]/g, ''));
+  }
+  if (t.includes("topline")) return 1;
+  if (t.includes("revision")) return 3; 
+  if (t.includes("brand plan") || t.includes("brand review")) return 10; 
+  if (t.includes("key learning")) return 5;
+  if (t.includes("case stud")) return 5;
+  if (t.includes("package")) return 14; 
+  if (b < 50000) return 2;
+  if (b < 300000) return 4;      
+  if (b < 500000) return 7;      
+  if (b < 800000) return 8;      
+  return 12;
+}
+
+function createSystemTriggers() {
+  const existingTriggers = ScriptApp.getProjectTriggers();
+  let timeTriggerExists = false;
+  let editTriggerExists = false;
+  let overdueTriggerExists = false;
+  let monthlyReportExists = false;
+  let annualReportExists = false;
+  let sixHourTriggerExists = false;
+
+  existingTriggers.forEach(t => {
+    if (t.getHandlerFunction() === 'processNewFiles') timeTriggerExists = true;
+    if (t.getHandlerFunction() === 'onStatusChange') editTriggerExists = true;
+    if (t.getHandlerFunction() === 'checkOverdueDeadlines') overdueTriggerExists = true;
+    if (t.getHandlerFunction() === 'sendMonthlyExecutiveReport') monthlyReportExists = true;
+    if (t.getHandlerFunction() === 'sendAnnualExecutiveReportTrigger') annualReportExists = true;
+    if (t.getHandlerFunction() === 'updateSignedCampaignsProgress') sixHourTriggerExists = true;
+  });
+
+  if (!timeTriggerExists) ScriptApp.newTrigger('processNewFiles').timeBased().everyMinutes(10).create();
+  if (!editTriggerExists) ScriptApp.newTrigger('onStatusChange').forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onEdit().create();
+  if (!overdueTriggerExists) ScriptApp.newTrigger('checkOverdueDeadlines').timeBased().atHour(9).everyDays(1).create();
+  if (!monthlyReportExists) ScriptApp.newTrigger('sendMonthlyExecutiveReport').timeBased().onMonthDay(1).atHour(8).create();
+  if (!annualReportExists) ScriptApp.newTrigger('sendAnnualExecutiveReportTrigger').timeBased().onMonthDay(1).atHour(8).create();
+  if (!sixHourTriggerExists) ScriptApp.newTrigger('updateSignedCampaignsProgress').timeBased().everyHours(6).create();
+
+  try { SpreadsheetApp.getUi().alert('Success! All automation and notification triggers are set.');
+  } catch(e) {}
+}
+
+function sendAnnualExecutiveReportTrigger() {
+  if (new Date().getMonth() === 0) { // Only run in January
+    sendAnnualExecutiveReport();
+  }
+}
+
+function getMention(name) {
+  if (!name) return "N/A";
+  const cleanName = String(name).trim();
+  if (USER_DIRECTORY[cleanName]) {
+    return `<users/${USER_DIRECTORY[cleanName]}>`;
+  }
+  return `*${cleanName}*`; 
+}
+
+function onStatusChange(e) {
+  if (!e || !e.range) return;
+  const sheet = e.range.getSheet();
+  if (sheet.getName() !== CONFIG.sheetName) return;
+
+  const colIndex = e.range.getColumn();
+  const rowIndex = e.range.getRow();
+  if (rowIndex <= 1) return;
+
+  const project = sheet.getRange(rowIndex, CONFIG.colIndices.project).getValue();
+  const brand = sheet.getRange(rowIndex, CONFIG.colIndices.brand).getValue(); 
+  const stratName = sheet.getRange(rowIndex, CONFIG.colIndices.strat).getValue();
+  const ccName = sheet.getRange(rowIndex, CONFIG.colIndices.cc).getValue();
+  const cellValue = e.value || e.range.getValue();
+  const newValue = String(cellValue).toLowerCase();
+
+  // --- NEW: CAMPAIGN BASE CODE DETECTOR ---
+  if (colIndex === CONFIG.colIndices.baseCodeEntry && cellValue) {
+    const baseCode = String(cellValue).trim();
+    const proposalLink = sheet.getRange(rowIndex, CONFIG.colIndices.proposalLink).getValue() || "";
+    processSignedCampaignCode(baseCode, stratName, proposalLink);
+  }
+
+  if (colIndex === CONFIG.colIndices.status) {
+    createDashboard();
+    if (newValue === "done" || newValue === "completed") {
+      const proposalLink = sheet.getRange(rowIndex, CONFIG.colIndices.proposalLink).getValue();
+      const proposalDisplay = proposalLink ? proposalLink : "N/A";
+      const message = `✅ *Proposal Completed*\n\n*Brand:* ${brand}\n*Strat:* ${getMention(stratName)} has marked the project as done.\n*Project:* ${project}\n*CC:* ${getMention(ccName)}\n*Proposal:* ${proposalDisplay}`;
+      sendWebhook(message);
+    }
+  }
+
+  if (colIndex === CONFIG.colIndices.strat && cellValue) {
+    createDashboard();
+    const message = `🔄 *Strat Update / Handover*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Update:* ${getMention(cellValue)} has taken over this project.`;
+    sendWebhook(message);
+  }
+
+  if (colIndex === CONFIG.colIndices.deadline) {
+    createDashboard(); 
+    const newDeadline = e.range.getDisplayValue(); 
+    let oldDeadline = e.oldValue || "N/A"; 
+    
+    if (oldDeadline !== "N/A" && !isNaN(oldDeadline) && Number(oldDeadline) > 20000) {
+      const serial = Number(oldDeadline);
+      const dateDate = new Date((serial - 25569) * 86400 * 1000);
+      oldDeadline = Utilities.formatDate(dateDate, Session.getScriptTimeZone(), "dd/MM/yyyy");
+    }
+    
+    if (newDeadline) {
+      const message = `📅 *Deadline Updated*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Old Deadline:* ${oldDeadline}\n*New Deadline:* ${newDeadline}\n\n*CC:* ${getMention(ccName)}\n*Strat:* ${getMention(stratName)}`;
+      sendWebhook(message);
+    }
+  }
+
+  if (colIndex >= CONFIG.colIndices.linkStart && colIndex <= CONFIG.colIndices.linkEnd && cellValue) {
+    const message = `📂 *Additional File Added*\n\n*Brand:* ${brand}\n*Project:* ${project}\n*Update:* Additional brief documents have been added.\n\n*CC:* ${getMention(ccName)}\n*Strat:* ${getMention(stratName)} please review.`;
+    sendWebhook(message);
+  }
+}
+
+function sendWebhook(text) {
+  if (!CONFIG.webhookUrl || CONFIG.webhookUrl.includes("PASTE_YOUR")) return;
+  const payload = JSON.stringify({ "text": text });
+  const options = { 'method': 'post', 'contentType': 'application/json', 'payload': payload, 'muteHttpExceptions': true };
+  try { UrlFetchApp.fetch(CONFIG.webhookUrl, options);
+  } catch (e) { Logger.log("Webhook failed: " + e.toString()); }
+}
+
+// ... PROCESS FILES LOGIC ...
+
+function processNewFiles() {
+  const newFilesFolder = DriveApp.getFolderById(CONFIG.newFilesFolderId);
+  const archiveFolder = DriveApp.getFolderById(CONFIG.archiveFolderId);
+  const summaryFolder = DriveApp.getFolderById(CONFIG.summaryDocsFolderId);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+
+  if (!sheet) {
+    Logger.log(`CRITICAL ERROR: Sheet "${CONFIG.sheetName}" not found!`);
+    return;
+  }
+
+  let processedCount = 0;
+
+  // 1. PROCESS FILES (Root)
+  const files = newFilesFolder.getFiles();
+  while (files.hasNext()) {
+    if (processedCount >= CONFIG.maxBatchSize) {
+      Logger.log("Batch limit reached (Files). Pausing.");
+      break; 
+    }
+    const file = files.next();
+    const success = processItem(file, sheet, archiveFolder, summaryFolder, false);
+    if (success) processedCount++;
+  }
+
+  // 2. PROCESS FOLDERS 
+  if (processedCount < CONFIG.maxBatchSize) {
+    const subFolders = newFilesFolder.getFolders();
+    while (subFolders.hasNext()) {
+      if (processedCount >= CONFIG.maxBatchSize) {
+        Logger.log("Batch limit reached (Folders). Pausing.");
+        break; 
+      }
+      const folder = subFolders.next();
+      if (folder.getId() === CONFIG.archiveFolderId || folder.getId() === CONFIG.summaryDocsFolderId) {
+        Logger.log(`[SAFETY] Skipping Protected Folder: ${folder.getName()}`);
+        continue;
+      }
+      const success = processItem(folder, sheet, archiveFolder, summaryFolder, true);
+      if (success) processedCount++;
+    }
+  }
+
+  if (processedCount > 0) {
+    createDashboard();
+    Logger.log(`Batch finished. Processed ${processedCount} items.`);
+  }
+}
+
+function processItem(item, sheet, archiveFolder, summaryFolder, isFolder) {
+  const name = item.getName();
+  if (!isValidNamingConvention(name)) {
+    Logger.log(`[SKIP] Ignored (Strict Mode): ${name}`);
+    return false;
+  }
+
+  Logger.log(`Processing: ${name}`);
+  const fileNameData = parseFilenameMetadata(name); 
+  
+  let text = "";
+  let fileLinks = ["", "", "", "", ""];
+  let firstFileUrl = "N/A";
+  let filesCount = 0;
+
+  if (isFolder) {
+    const folderFiles = item.getFiles();
+    let i = 0;
+    while (folderFiles.hasNext()) {
+      const f = folderFiles.next();
+      if (i === 0) firstFileUrl = f.getUrl();
+      if (i < 5) fileLinks[i] = `=HYPERLINK("${f.getUrl()}", "📂 Open File")`;
+      let extracted = extractTextSmartly(f) || "";
+      if (extracted) text += `\n\n--- FILE: ${f.getName()} ---\n${extracted}\n`;
+      i++;
+      filesCount++;
+      Utilities.sleep(1000);
+    }
+    if (filesCount === 0) {
+      Logger.log("❌ Error: Folder processed but no readable files found inside.");
+      return false; 
+    }
+  } else {
+    text = extractTextSmartly(item) || "";
+    firstFileUrl = item.getUrl();
+    fileLinks[0] = `=HYPERLINK("${item.getUrl()}", "📂 Open File")`;
+  }
+
+  Logger.log(`[DEBUG] Extracted Text Length: ${text.length} chars.`);
+  if (!text || text.length < 5) {
+    Logger.log("❌ Error: No text could be extracted (OCR Failed or Empty File).");
+    return false;
+  }
+
+  let aiData = getAiDataWithFallback(text, fileNameData);
+  
+  if (!aiData) {
+    Logger.log("❌ Error: AI analysis returned null. Skipping archive to preserve data.");
+    return false;
+  }
+
+  const trackingCode = generateTrackingCode();
+  const summaryDoc = createSummaryDoc(aiData, trackingCode, summaryFolder, `Source: ${name}`);
+  const summaryLink = `=HYPERLINK("${summaryDoc.getUrl()}", "📄 View Summary")`;
+
+  appendDataToSheet(sheet, trackingCode, fileNameData, aiData, summaryLink, fileLinks);
+  
+  let scoreEmoji = aiData.briefScore >= 7 ? "🟢" : (aiData.briefScore >= 5 ? "🟡" : "🔴");
+  let budgetDisplay = fileNameData.budget ? `RM ${fileNameData.budget}` : "N/A";
+  const notifyMsg = `🚀 *New Brief Uploaded*\n\n*Brand:* ${aiData.brand}\n*Project:* ${aiData.campaignName}\n*Budget:* ${budgetDisplay}\n*Score:* ${scoreEmoji} ${aiData.briefScore}/10\n*Missing:* ${aiData.missingInfo || "None"}\n\n*CC:* ${getMention(fileNameData.clientChampion)}\n*Strat:* ${getMention(fileNameData.strat)}\n*Brief Link:* ${firstFileUrl}`;
+  sendWebhook(notifyMsg);
+
+  if (isFolder) moveFolderToArchive(item, archiveFolder);
+  else item.moveTo(archiveFolder);
+  
+  return true;
+}
+
+// ... HELPERS ...
+
+function extractTextSmartly(file) {
+  const mimeType = file.getMimeType();
+  if (mimeType === 'message/rfc822' || mimeType.startsWith('text/')) {
+    return file.getBlob().getDataAsString();
+  }
+  return performRobustOCR(file) || "";
+}
+
+function parseFilenameMetadata(fileName) {
+  const parts = fileName.split('_');
+  const rawDate = parts.length > 4 ? parts.slice(4).join('_').trim() : "";
+  let dateObj = rawDate;
+  
+  if (rawDate) {
+    const dateParts = rawDate.split('/');
+    if (dateParts.length === 3) dateObj = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+  }
+  
+  return {
+      clientChampion: parts.length > 0 ? parts[0].trim() : "N/A",
+      strat:          parts.length > 1 ? parts[1].trim() : "N/A",
+      budget:         parts.length > 2 ? parts[2].trim() : "",
+      typeOfDeck:     parts.length > 3 ? parts[3].trim() : "N/A",
+      deadline:       dateObj 
+  };
+}
+
+function createSummaryDoc(aiData, trackingCode, folder, sourceInfo) {
+  const summaryDoc = DocumentApp.create(`${trackingCode} - ${aiData.campaignName || 'Untitled'} - Summary`);
+  const summaryDocFile = DriveApp.getFileById(summaryDoc.getId());
+  folder.addFile(summaryDocFile);
+  DriveApp.getRootFolder().removeFile(summaryDocFile);
+  
+  const body = summaryDoc.getBody();
+  addSection(body, "Metadata", sourceInfo);
+  
+  body.appendParagraph(`Brief Quality Score: ${aiData.briefScore}/10`).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  if (aiData.missingInfo && aiData.missingInfo !== "None") {
+    body.appendParagraph(`⚠️ Missing Info: ${aiData.missingInfo}`).setForegroundColor("#FF0000");
+  }
+
+  addSection(body, "Core Brief Requirements", aiData.summary_brief);
+  addSection(body, "Timeline & Period", aiData.summary_campaignPeriod);
+  addSection(body, "Target Audience", aiData.summary_targetAudience);
+  addSection(body, "Key Deliverables", aiData.summary_campaignDetails);
+  addSection(body, "Mandatory Inclusions", aiData.summary_buzzIdeas);
+  addSection(body, "Budget Breakdown", aiData.summary_budget);
+  
+  return summaryDoc;
+}
+
+function appendDataToSheet(sheet, trackingCode, fileNameData, aiData, summaryLink, fileLinksArray) {
+  const lastRow = sheet.getLastRow() + 1;
+  const slaDays = calculateSLADays(fileNameData.typeOfDeck, fileNameData.budget);
+  const slaDateFormula = `=WORKDAY(U${lastRow}, ${slaDays})`;
+
+  let missingInfoClean = aiData.missingInfo;
+  if (Array.isArray(missingInfoClean)) {
+    missingInfoClean = missingInfoClean.join(", ");
+  } else if (typeof missingInfoClean === 'object') {
+    missingInfoClean = JSON.stringify(missingInfoClean).replace(/"/g, '').replace(/[[\]{}]/g, '');
+  }
+
+  sheet.appendRow([
+    trackingCode, 
+    fileNameData.typeOfDeck, 
+    aiData.parentCompany || "N/A", 
+    aiData.brand || "N/A", 
+    aiData.campaignName || "N/A", 
+    fileNameData.budget,           
+    fileNameData.strat, 
+    fileNameData.clientChampion, 
+    aiData.industryOrInternal || "N/A", 
+    "", "", 
+    fileNameData.deadline, 
+    summaryLink,
+    fileLinksArray[0], fileLinksArray[1], fileLinksArray[2], fileLinksArray[3], fileLinksArray[4], 
+    aiData.briefScore, 
+    missingInfoClean, 
+    new Date(),
+    slaDays, 
+    slaDateFormula 
+  ]);
+  sheet.getRange(lastRow, 6).setNumberFormat('"RM" #,##0.00'); 
+  sheet.getRange(lastRow, 12).setNumberFormat('dd/mm/yyyy');
+  sheet.getRange(lastRow, 23).setNumberFormat('dd/mm/yyyy');
+}
+
+function moveFolderToArchive(sourceFolder, targetParentFolder) {
+  const newFolder = targetParentFolder.createFolder(sourceFolder.getName());
+  const files = sourceFolder.getFiles();
+  while (files.hasNext()) { files.next().moveTo(newFolder); }
+  const subFolders = sourceFolder.getFolders();
+  while (subFolders.hasNext()) { moveFolderToArchive(subFolders.next(), newFolder); }
+  sourceFolder.setTrashed(true);
+}
+
+function addSection(body, title, content) {
+  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  let textToWrite = 'N/A';
+  if (content) {
+    if (Array.isArray(content)) {
+      textToWrite = content.map(item => {
+        if (typeof item === 'object' && item !== null) return Object.values(item).join(' - ');
+        return String(item);
+      }).join('\n');
+    } else if (typeof content === 'object') {
+      textToWrite = JSON.stringify(content, null, 2);
+    } else {
+      textToWrite = String(content);
+    }
+  }
+  body.appendParagraph(textToWrite);
+}
+
+function performRobustOCR(file) {
+  let attempts = 0;
+  while (attempts < 3) {
+    let tempDocId = null;
+    try {
+      const fileBlob = file.getBlob();
+      const resource = { title: `[TEMP OCR] ${file.getName()}`, mimeType: fileBlob.getContentType() };
+      const tempDocFile = Drive.Files.insert(resource, fileBlob, { ocr: true });
+      tempDocId = tempDocFile.id;
+      const text = DocumentApp.openById(tempDocId).getBody().getText();
+      DriveApp.getFileById(tempDocId).setTrashed(true);
+      return text;
+    } catch (e) {
+      if (tempDocId) try { DriveApp.getFileById(tempDocId).setTrashed(true); } catch(err){}
+      if (e.toString().includes("rate limit")) {
+        attempts++;
+        Utilities.sleep(attempts * 5000); 
+      } else {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+// UPDATED: ENTERPRISE MODEL PRIORITY (2.0 -> 1.5 Pro)
+function getAiDataWithFallback(fileContent, metadata) {
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  const models = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`
+  ];
+
+  let deadlineStr = "Unknown";
+  if (metadata.deadline instanceof Date) {
+    deadlineStr = Utilities.formatDate(metadata.deadline, Session.getScriptTimeZone(), "dd/MM/yyyy");
+  }
+
+  const APPROVED_INDUSTRIES = `Agriculture, Airlines, Alcohol, Apps, Automobile, Baby/Child, Banking/Finance, Beauty/Skincare, Cinema, Content Producer, E-Commerce, E-wallet, Education, Electronics/Gadgets, Entertainment, Event, Eyewear, F&B, Fashion & Apparels, Feminine Care, FMCG - Drinks, FMCG - Food, FMCG - Household, FMCG - Pharmaceutical, Gambling, Gaming, GLC, Government, GUM, Healthcare, Home Appliances, Home Improvement, Industrial, Insurance, Internal (Omnia), Internal (REV), Jewellery, Milk, Mobile Apps, Movies, NGO, Oil & Gas, Pet Care, Postal, Property, Radio, Retail, Service, Software, Sports, Super Apps, Survey, Tech & Gadget, Telco, Themepark/Recreational, Timepiece, Tobacco, Trading & Investments, Travel & Tourism, TV, Utilities`;
+
+  const prompt = `
+    You are an expert Strategic Planner performing a "Brief Audit".
+    Analyze the provided project documents. 
+    CONTEXT FROM FILENAME:
+    - Budget: ${metadata.budget || "Unknown"}
+    - Deadline: ${deadlineStr}
+    - CC: ${metadata.clientChampion}
+    - Strat: ${metadata.strat}
+    1. EXTRACT key information.
+    2. GRADE the brief quality (1-10).
+    3. IDENTIFY missing info.
+    4. CLASSIFY the industry ("industryOrInternal") strictly using the list below.
+    APPROVED INDUSTRIES LIST:
+    ${APPROVED_INDUSTRIES}
+    INSTRUCTION: If the industry does not match exactly, choose the closest one from the list.
+    Return ONLY a JSON object:
+    "brand", "campaignName", "parentCompany", "industryOrInternal", "summary_brief", "summary_campaignPeriod", "summary_targetAudience", "summary_campaignDetails", "summary_buzzIdeas", "summary_budget", "briefScore", "missingInfo".
+    IMPORTANT FORMATTING:
+    - Retain the exact casing for "brand" and "parentCompany" as they appear in the text.
+    Do NOT force Title Case.
+    TEXT TO ANALYZE:
+    ${fileContent.substring(0, 80000)} 
+  `;
+
+  const payload = JSON.stringify({ "contents": [{ "parts": [{ "text": prompt }] }] });
+  const options = { 'method': 'post', 'contentType': 'application/json', 'payload': payload, 'muteHttpExceptions': true };
+
+  for (const url of models) {
+    try {
+      const response = UrlFetchApp.fetch(url, options);
+      const code = response.getResponseCode();
+      Logger.log(`[DEBUG] Gemini Response Code: ${code} for URL: ${url}`);
+      if (code === 200) {
+        const rawJson = response.getContentText();
+        const json = JSON.parse(rawJson);
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!text) {
+           Logger.log(`[DEBUG] Gemini Finish Reason: ${json.candidates?.[0]?.finishReason}`);
+           Logger.log(`[DEBUG] Gemini Safety Ratings: ${JSON.stringify(json.candidates?.[0]?.safetyRatings)}`);
+        }
+
+        if (text) {
+          const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
+          let data = JSON.parse(cleanJson);
+          
+          const badNames = ["N/A", "Not Specified", "Not specified", "Untitled", "Unknown", "TBD"];
+          if (!data.campaignName || badNames.includes(data.campaignName) || data.campaignName.trim() === "") {
+             data.campaignName = `Proposal For ${data.brand || "Client"}`;
+          }
+
+          if ((!data.summary_budget || data.summary_budget === "N/A" || data.summary_budget === "Not specified") && metadata.budget) {
+             data.summary_budget = `RM ${metadata.budget} (Sourced from filename)`;
+          }
+
+          if (Array.isArray(data.missingInfo)) {
+             data.missingInfo = data.missingInfo.join(", ");
+          } else if (typeof data.missingInfo === 'object') {
+             data.missingInfo = JSON.stringify(data.missingInfo).replace(/"/g, '').replace(/[[\]{}]/g, '');
+          }
+
+          return data;
+        }
+      }
+    } catch (e) { Logger.log(`Model Error: ${e.toString()}`); }
+  }
+  return null;
+}
+
+function generateTrackingCode() {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const now = new Date();
+  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const datePrefix = months[now.getMonth()] + String(now.getDate()).padStart(2, '0');
+  const lastDate = scriptProperties.getProperty('tracking_lastDate');
+  let sequence = (lastDate !== datePrefix) ? 'A' : incrementString(scriptProperties.getProperty('tracking_sequence') || 'A');
+  scriptProperties.setProperties({ 'tracking_lastDate': datePrefix, 'tracking_sequence': sequence });
+  return datePrefix + sequence;
+}
+
+function incrementString(str) {
+  let carry = 1, result = '';
+  for (let i = str.length - 1; i >= 0; i--) {
+    let charCode = str.charCodeAt(i) + carry;
+    carry = 0;
+    if (charCode > 90) { charCode = 65; carry = 1; }
+    result = String.fromCharCode(charCode) + result;
+  }
+  return (carry > 0 ? 'A' : '') + result;
+}
+
+function isValidNamingConvention(name) {
+  if (name.startsWith("~$")) return false; 
+  const parts = name.split('_');
+  return parts.length >= 5;
+}
+
+function checkAvailableModels() {
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!API_KEY) { 
+    SpreadsheetApp.getUi().alert("FATAL ERROR: GEMINI_API_KEY not found in Script Properties.");
+    return;
+  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
+  try {
+    const response = UrlFetchApp.fetch(url, { 'method': 'get', 'muteHttpExceptions': true });
+    Logger.log("--- DIAGNOSTIC RESULT ---");
+    Logger.log(response.getContentText());
+    SpreadsheetApp.getUi().alert("Check your Apps Script Logs (View > Executions) for the list of available models.");
+  } catch (e) { 
+    Logger.log(e.toString()); 
+    SpreadsheetApp.getUi().alert("Connection Failed: " + e.toString());
+  }
+}
+
+function getWeekNumber(d) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  var weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+  return weekNo;
+}
+
+// --- OVERDUE EMAIL TRACKER ---
+
+function checkOverdueDeadlines() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+  if (!sheet) return;
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift(); 
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  data.forEach((row) => {
+    const stratName = row[CONFIG.colIndices.strat - 1]; 
+    const status = String(row[CONFIG.colIndices.status - 1]).toLowerCase();
+    const deadline = row[CONFIG.colIndices.deadline - 1];
+    const brand = row[CONFIG.colIndices.brand - 1];
+    const project = row[CONFIG.colIndices.project - 1];
+
+    if (!stratName || stratName === "N/A" || status === "done" || status === "completed") return;
+
+    if (deadline instanceof Date) {
+      const deadlineDate = new Date(deadline);
+      deadlineDate.setHours(0, 0, 0, 0); 
+      
+      if (deadlineDate < today) {
+        const formattedDeadline = Utilities.formatDate(deadlineDate, Session.getScriptTimeZone(), "dd/MM/yyyy");
+        sendPrivateOverdueEmail(stratName, brand, project, formattedDeadline);
+      }
+    }
+  });
+}
+
+function sendPrivateOverdueEmail(stratName, brand, project, deadline) {
+  const emailAddress = STRAT_EMAILS[stratName];
+  if (!emailAddress || emailAddress.includes("PLACEHOLDER") || emailAddress.includes("example.com")) {
+    Logger.log(`Skipping overdue email for ${stratName}: No valid email configured yet.`);
+    return;
+  }
+
+  const subject = `🚨 Overdue Reminder: ${brand} - ${project}`;
+  const body = `Hi ${stratName},\n\nThis is a friendly automated reminder that your proposal for the project below has passed its deadline and hasn't been marked as 'Done' in the system yet:\n\n` +
+               `Brand: ${brand}\n` +
+               `Project: ${project}\n` +
+               `Deadline: ${deadline}\n\n` +
+               `Please update the master list when you get a chance! Let the team know if you need any support or an extension.\n\n` +
+               `Best,\nYour Friendly Automation Bot`;
+
+  try {
+    MailApp.sendEmail(emailAddress, subject, body);
+    Logger.log(`Overdue email successfully sent to ${stratName} for ${project}`);
+  } catch (e) {
+    Logger.log(`Failed to send email to ${stratName}: ${e.message}`);
+  }
+}
+
+// --- CAMPAIGN PERFORMANCE FETCHER & AGGREGATOR ---
+
+// CUSTOM DATE PARSER FOR "11-May-26" FORMAT
+function parsePerformanceDate(dateStr) {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  
+  const parts = String(dateStr).trim().split('-');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const monthStr = parts[1].toUpperCase();
+    const year = parseInt(parts[2], 10) + 2000; // Assuming 2000s
+    const months = { "JAN":0, "FEB":1, "MAR":2, "APR":3, "MAY":4, "JUN":5, "JUL":6, "AUG":7, "SEP":8, "OCT":9, "NOV":10, "DEC":11 };
+    
+    if (months[monthStr] !== undefined && !isNaN(day) && !isNaN(year)) {
+       return new Date(year, months[monthStr], day);
+    }
+  }
+  return null;
+}
+
+// LONGEST COMMON PREFIX EXTRACTOR FOR CAMPAIGN NAMES
+function getCommonPrefix(namesArray) {
+  if (!namesArray || namesArray.length === 0) return "N/A";
+  if (namesArray.length === 1) return namesArray[0].trim();
+  
+  let prefix = namesArray[0];
+  for (let i = 1; i < namesArray.length; i++) {
+    while (namesArray[i].indexOf(prefix) !== 0) {
+      prefix = prefix.substring(0, prefix.length - 1);
+      if (prefix === "") return "Multiple Campaigns";
+    }
+  }
+  return prefix.trim();
+}
+
+function processSignedCampaignCode(baseCode, stratName, proposalLink) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let signedSheet = ss.getSheetByName(CONFIG.signedCampaignsSheetName);
+  
+  if (!signedSheet) {
+    signedSheet = ss.insertSheet(CONFIG.signedCampaignsSheetName);
+    // V72.6: UPDATED HEADERS
+    signedSheet.appendRow(["Base Code", "Campaign Name", "Strategist", "Total Gross Rev", "Total Net Rev", "Start Date", "End Date", "Avg Progress", "Proposal Link", "Signed IO Link", "Last Updated"]);
+    signedSheet.getRange("A1:K1").setFontWeight("bold");
+    signedSheet.getRange("D:E").setNumberFormat('"RM" #,##0.00');
+    signedSheet.getRange("F:G").setNumberFormat('dd/mm/yyyy');
+    signedSheet.getRange("H:H").setNumberFormat('0.00%');
+  }
+  
+  const aggData = fetchAndAggregateCampaignData(baseCode);
+  
+  if (!aggData) {
+    SpreadsheetApp.getActiveSpreadsheet().toast(`No data found in Performance Sheet for base code: ${baseCode}`);
+    return;
+  }
+  
+  const data = signedSheet.getDataRange().getValues();
+  let foundRow = -1;
+  
+  for(let i=1; i<data.length; i++) {
+    if(data[i][0] === baseCode) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+  
+  // V72.6: PUSH ALL NEW COLUMNS
+  const rowData = [
+    baseCode, aggData.campaignName, stratName, aggData.gross, aggData.net, 
+    aggData.startDate, aggData.endDate, aggData.progress, proposalLink, aggData.ioLink, new Date()
+  ];
+
+  if (foundRow > -1) {
+    signedSheet.getRange(foundRow, 1, 1, 11).setValues([rowData]);
+  } else {
+    signedSheet.appendRow(rowData);
+  }
+  SpreadsheetApp.getActiveSpreadsheet().toast(`Successfully synced campaign data for: ${baseCode}`);
+}
+
+function fetchAndAggregateCampaignData(baseCode) {
+   if (!CONFIG.campaignPerformanceSheetId || CONFIG.campaignPerformanceSheetId.includes("PLACEHOLDER")) return null;
+   
+   let perfSs;
+   try { perfSs = SpreadsheetApp.openById(CONFIG.campaignPerformanceSheetId); } 
+   catch(e) { Logger.log("Cannot open Performance sheet. Check ID and Permissions."); return null; }
+   
+   const sheet = perfSs.getSheets()[0]; 
+   const data = sheet.getDataRange().getValues();
+   
+   let totalGross = 0, totalNet = 0, totalProgress = 0, matchCount = 0;
+   let startDates = [], endDates = [], campaignNames = [];
+   let foundIoLink = "";
+   const pIdx = CONFIG.perfColIndices;
+   
+   for (let i = 1; i < data.length; i++) {
+     const row = data[i];
+     const code = String(row[pIdx.code - 1] || "").trim();
+     
+     // V72.6: STRICT MATCHING (Matches exact baseCode, or baseCode + up to 2 letters like MAY26008A)
+     if (code === baseCode || (code.startsWith(baseCode) && code.length <= baseCode.length + 2)) {
+        
+        let rawGross = String(row[pIdx.gross - 1] || "0").replace(/[^0-9.-]/g, '');
+        let rawNet = String(row[pIdx.net - 1] || "0").replace(/[^0-9.-]/g, '');
+        totalGross += parseFloat(rawGross) || 0;
+        totalNet += parseFloat(rawNet) || 0;
+        
+        // V72.6: CUSTOM DATE PARSING
+        const sDate = parsePerformanceDate(row[pIdx.start - 1]);
+        if (sDate) startDates.push(sDate);
+        
+        const eDate = parsePerformanceDate(row[pIdx.end - 1]);
+        if (eDate) endDates.push(eDate);
+
+        // V72.6: CAMPAIGN NAME COLLECTION
+        const cName = String(row[pIdx.campaignName - 1] || "").trim();
+        if (cName) campaignNames.push(cName);
+        
+        // -------------------------------------------------------------------
+        // V72.6.1: EXTRACT IO LINK FROM SMART CHIP (Memory Optimized)
+        // -------------------------------------------------------------------
+        if (!foundIoLink) {
+           // i + 1 because sheet rows are 1-indexed, but our loop array is 0-indexed
+           let cellRichText = sheet.getRange(i + 1, pIdx.ioLink).getRichTextValue();
+           if (cellRichText) {
+               let link = cellRichText.getLinkUrl();
+               if (link) foundIoLink = `=HYPERLINK("${link}", "📄 View IO")`;
+           }
+        }
+
+        // SAFELY PARSE PROGRESS TO DECIMAL
+        let progRaw = String(row[pIdx.progress - 1] || "0");
+        let progVal = parseFloat(progRaw.replace(/[^0-9.-]/g, '')) || 0;
+        if (progRaw.includes('%') || progVal > 1) { progVal = progVal / 100; }
+        
+        totalProgress += progVal;
+        matchCount++;
+     }
+   }
+   
+   if (matchCount === 0) return null;
+   
+   const avgProgress = totalProgress / matchCount;
+   const minStart = startDates.length > 0 ? new Date(Math.min.apply(null, startDates)) : "N/A";
+   const maxEnd = endDates.length > 0 ? new Date(Math.max.apply(null, endDates)) : "N/A";
+   const finalCampaignName = getCommonPrefix(campaignNames);
+
+   return { 
+     gross: totalGross, 
+     net: totalNet, 
+     startDate: minStart, 
+     endDate: maxEnd, 
+     progress: avgProgress,
+     campaignName: finalCampaignName,
+     ioLink: foundIoLink || "N/A"
+   };
+}
+
+function updateSignedCampaignsProgress() {
+   const ss = SpreadsheetApp.getActiveSpreadsheet();
+   const signedSheet = ss.getSheetByName(CONFIG.signedCampaignsSheetName);
+   if (!signedSheet) return;
+   
+   const data = signedSheet.getDataRange().getValues();
+   if (data.length <= 1) return;
+   
+   for (let i = 1; i < data.length; i++) {
+     const baseCode = data[i][0];
+     const stratName = data[i][2]; // Index 2 because Campaign Name is now Index 1
+     const existingProposalLink = data[i][8] || ""; // Index 8 is Proposal Link
+     
+     if (baseCode) {
+        const aggData = fetchAndAggregateCampaignData(baseCode);
+        if (aggData) {
+          const rowData = [ 
+            baseCode, aggData.campaignName, stratName, aggData.gross, aggData.net, 
+            aggData.startDate, aggData.endDate, aggData.progress, existingProposalLink, aggData.ioLink, new Date() 
+          ];
+          signedSheet.getRange(i + 1, 1, 1, 11).setValues([rowData]);
+        }
+     }
+   }
+}
+
+// --- MONTHLY & ANNUAL EXECUTIVE REPORTS ---
+
+function sendMonthlyExecutiveReport(isManual = false) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+  if (!sheet) return;
+
+  const today = new Date();
+  let targetMonth = today.getMonth() - 1;
+  let targetYear = today.getFullYear();
+
+  if (targetMonth < 0) { targetMonth = 11; targetYear--; }
+
+  generateAndSendReport(sheet, targetMonth, targetYear, "Monthly");
+}
+
+function sendAnnualExecutiveReport(isManual = false) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+  if (!sheet) return;
+
+  const today = new Date();
+  const targetYear = today.getFullYear() - 1;
+
+  generateAndSendReport(sheet, null, targetYear, "Annual");
+}
+
+function generateAndSendReport(sheet, targetMonth, targetYear, reportType) {
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift();
+  
+  let totalBriefs = 0, totalBudget = 0, completedCount = 0, totalScore = 0, scoredBriefsCount = 0;
+  let stratCounts = {}, deckTypes = {};
+  
+  data.forEach(row => {
+    const generatedOn = row[20]; // Column U
+    
+    if (generatedOn instanceof Date) {
+      const matchMonth = (targetMonth === null) ? true : (generatedOn.getMonth() === targetMonth);
+      if (matchMonth && generatedOn.getFullYear() === targetYear) {
+        totalBriefs++;
+        
+        let rawBudget = String(row[5] || "0").replace(/[^0-9.]/g, '');
+        let budgetVal = parseFloat(rawBudget);
+        if (!isNaN(budgetVal)) totalBudget += budgetVal;
+
+        const status = String(row[9]).toLowerCase(); // Column J
+        if (status === "done" || status === "completed") completedCount++;
+
+        const strat = row[6]; // Column G
+        if (strat && strat !== "N/A") {
+          if (!stratCounts[strat]) stratCounts[strat] = { count: 0, budget: 0 };
+          
+          stratCounts[strat].count++;
+          stratCounts[strat].budget += budgetVal || 0;
+        }
+
+        const score = parseFloat(row[18]); // Column S
+        if (!isNaN(score) && score > 0) { totalScore += score;
+          scoredBriefsCount++; }
+
+        const deckType = row[1] || "Unknown";
+        // Column B
+        deckTypes[deckType] = (deckTypes[deckType] || 0) + 1;
+      }
+    }
+  });
+
+  if (totalBriefs === 0) {
+    SpreadsheetApp.getUi().alert(`No data found for ${reportType} report target.`);
+    return;
+  }
+
+  const completionRate = Math.round((completedCount / totalBriefs) * 100) + "%";
+  const averageScore = scoredBriefsCount > 0 ? (totalScore / scoredBriefsCount).toFixed(1) : "N/A";
+  const formattedBudget = "RM " + totalBudget.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  
+  let stratHtmlList = "";
+  let sortedStrats = Object.entries(stratCounts).sort((a, b) => b[1].count - a[1].count);
+  sortedStrats.forEach(([name, data]) => {
+    const budgFmt = "RM " + data.budget.toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    stratHtmlList += `<li><strong>${name}</strong>: ${data.count} briefs (${budgFmt})</li>`;
+  });
+
+  let deckHtmlList = "";
+  let sortedDecks = Object.entries(deckTypes).sort((a, b) => b[1] - a[1]);
+  sortedDecks.forEach(([type, count]) => { deckHtmlList += `<li><strong>${type}</strong>: ${count}</li>`; });
+
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const titlePeriod = reportType === "Monthly" ? `${monthNames[targetMonth]} ${targetYear}` : `Year in Review: ${targetYear}`;
+  
+  const subject = `📊 ${reportType} Strategy Department Report - ${titlePeriod}`;
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+      <h2 style="color: #0b5394; text-align: center; border-bottom: 2px solid #0b5394; padding-bottom: 10px;">
+        Strategy Dept. ${reportType} Report - ${titlePeriod}
+      </h2>
+      <h3 style="color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px;">📈 1. Pipeline & Volume</h3>
+      <p style="margin: 5px 0;"><strong>Total Briefs Received:</strong> ${totalBriefs}</p>
+      <p style="margin: 5px 0;"><strong>Total Budget Pipeline:</strong> ${formattedBudget}</p>
+      <p style="margin: 5px 0;"><strong>Completion Rate:</strong> ${completionRate} (${completedCount}/${totalBriefs} finished)</p>
+      <br>
+      <h3 style="color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px;">🧠 2. Quality Control (AI Graded)</h3>
+      <p style="margin: 5px 0;"><strong>Average Incoming Brief Score:</strong> ${averageScore} / 10</p>
+      <p style="margin: 10px 0 5px 0;"><strong>Top Requested Deck Types:</strong></p>
+      <ul style="margin-top: 0; padding-left: 20px;">${deckHtmlList}</ul>
+      <br>
+      <h3 style="color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px;">❤️ 3. Team Health & Capacity</h3>
+      <p style="margin: 10px 0 5px 0;"><strong>Workload Distribution & Budget Handled:</strong></p>
+      <ul style="margin-top: 0; padding-left: 20px;">${stratHtmlList}</ul>
+      <div style="margin-top: 30px; padding: 15px; background-color: #f9f9f9; text-align: center; font-size: 12px; color: #777; border-radius: 4px;">
+        This is an automated executive summary generated from the Strategy Work List dashboard.
+      </div>
+    </div>
+  `;
+
+  if (CONFIG.leadershipEmails) {
+    MailApp.sendEmail({ to: CONFIG.leadershipEmails, subject: subject, htmlBody: htmlBody });
+  } else { Logger.log("No leadership email configured."); }
+}
