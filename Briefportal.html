@@ -1,0 +1,2086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Client Champion Brief Portal</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f2f2f2;
+      color: #111;
+      min-height: 100vh;
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: #111;
+      color: #fff;
+      padding: 18px 20px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
+    .header p  { font-size: 12px; color: #777; margin-top: 2px; }
+
+    /* ── LAYOUT — always full width, no media queries ── */
+    .container { width: 100%; max-width: 100%; margin: 0; padding: 0 0 90px; }
+
+    /* ── CARD — edge-to-edge always ── */
+    .card { background: #fff; border-radius: 0; padding: 22px 16px 26px; margin-bottom: 8px; box-shadow: none; width: 100%; }
+    .card-label {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.8px;
+      text-transform: uppercase; color: #999; margin-bottom: 20px;
+    }
+
+    /* ── FIELDS ── */
+    .field { margin-bottom: 18px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label { display: block; font-size: 15px; font-weight: 600; color: #333; margin-bottom: 8px; }
+
+    .select-wrap { position: relative; }
+    .select-wrap::after {
+      content: '▾'; position: absolute; right: 13px; top: 50%;
+      transform: translateY(-50%); pointer-events: none; color: #aaa; font-size: 14px;
+    }
+
+    select, input[type="text"], input[type="number"], input[type="date"], input[type="url"] {
+      width: 100%; padding: 15px 16px; border: 1.5px solid #e0e0e0; border-radius: 12px;
+      font-size: 17px; /* 17px — iOS zooms on anything under 16px */
+      color: #111; background: #f7f7f7;
+      -webkit-appearance: none; appearance: none; outline: none;
+      transition: border-color 0.15s, background 0.15s;
+      touch-action: manipulation;
+    }
+    select { padding-right: 40px; }
+    select:focus, input:focus { border-color: #111; background: #fff; }
+    select:invalid { color: #aaa; }
+
+    /* ── FILENAME PREVIEW ── */
+    .preview {
+      display: none; margin-top: 14px; background: #f2f2f2;
+      border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #888;
+    }
+    .preview strong { color: #111; font-family: monospace; font-size: 11px; word-break: break-all; }
+
+    /* ── BRIEF TOGGLE ── */
+    .toggle-row {
+      display: flex; background: #f2f2f2; border-radius: 10px;
+      padding: 3px; margin-bottom: 16px;
+    }
+    .toggle-btn {
+      flex: 1; padding: 12px; border: none; border-radius: 8px;
+      background: transparent; font-size: 15px; font-weight: 500;
+      color: #888; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+      touch-action: manipulation;
+    }
+    .toggle-btn.active {
+      background: #fff; color: #111;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1); font-weight: 600;
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ── CUSTOM RICH TEXT EDITOR ── */
+    .editor-wrap {
+      border: 1.5px solid #e8e8e8;
+      border-radius: 9px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .editor-wrap:focus-within { border-color: #111; }
+
+    .editor-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      padding: 8px 10px;
+      background: #fafafa;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .tb-btn {
+      width: 44px; height: 44px; /* Apple HIG minimum touch target */
+      border: none; border-radius: 9px;
+      background: transparent; color: #555;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.12s, color 0.12s;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .tb-btn:hover { background: #ebebeb; color: #111; }
+    .tb-btn:active { background: #ddd; }
+    .tb-btn.active { background: #111; color: #fff; }
+    .tb-divider { width: 1px; background: #e0e0e0; margin: 4px 3px; align-self: stretch; }
+
+    .editor-hints {
+      padding: 9px 16px;
+      font-size: 13px;
+      color: #aaa;
+      background: #fafafa;
+      border-bottom: 1px solid #f0f0f0;
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .editor-hints::-webkit-scrollbar { display: none; }
+    .editor-hints code {
+      font-family: monospace;
+      font-size: 11px;
+      background: #efefef;
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: #555;
+    }
+
+    .editor-body {
+      min-height: 200px;
+      padding: 14px 16px;
+      font-size: 17px;
+      line-height: 1.6;
+      outline: none;
+      color: #111;
+      overflow-y: auto;
+      touch-action: manipulation;
+    }
+    .editor-body:empty::before {
+      content: attr(data-placeholder);
+      color: #bbb;
+      pointer-events: none;
+    }
+    .editor-body ul, .editor-body ol { padding-left: 20px; }
+    .editor-body a { color: #0066cc; }
+
+    /* ── FILE UPLOAD ── */
+    .upload-zone {
+      border: 1.5px dashed #d5d5d5; border-radius: 10px;
+      padding: 20px 16px; text-align: center; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s; background: #fafafa;
+    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: #111; background: #f5f5f5; }
+    .upload-icon { font-size: 28px; margin-bottom: 6px; }
+    .upload-label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 3px; }
+    .upload-sub { font-size: 12px; color: #aaa; }
+
+    .file-list { margin-top: 14px; }
+    .file-chip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: #f5f5f5;
+      border-radius: 8px; margin-bottom: 8px;
+    }
+    .file-chip-icon { font-size: 18px; flex-shrink: 0; }
+    .file-chip-info { flex: 1; min-width: 0; }
+    .file-chip-name { font-size: 13px; font-weight: 500; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-chip-size { font-size: 11px; color: #aaa; margin-top: 1px; }
+    .file-size-warning { color: #c0392b; }
+    .file-chip-remove {
+      flex-shrink: 0; width: 26px; height: 26px; border: none;
+      background: #e5e5e5; border-radius: 6px; color: #888;
+      font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .file-chip-remove:hover { background: #d5d5d5; color: #333; }
+
+    /* ── SUBMIT ── */
+    .submit-btn {
+      width: 100%; padding: 18px; background: #111; color: #fff;
+      border: none; border-radius: 14px; font-size: 18px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s, opacity 0.15s; letter-spacing: -0.2px;
+      touch-action: manipulation;
+    }
+    .submit-btn:active { background: #333; }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .loading-state { display: none; text-align: center; padding: 14px 0 0; color: #888; font-size: 13px; }
+    .progress-bar-wrap {
+      height: 4px; background: #e8e8e8; border-radius: 2px;
+      margin: 10px 0 0; overflow: hidden; display: none;
+    }
+    .progress-bar { height: 100%; background: #111; border-radius: 2px; width: 0%; transition: width 0.3s ease; }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #111; color: #fff; padding: 13px 22px;
+      border-radius: 12px; font-size: 14px; font-weight: 500;
+      opacity: 0; transition: all 0.25s ease; pointer-events: none;
+      z-index: 100; max-width: 90vw; text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.success { background: #1a6e3e; }
+    .toast.error   { background: #b91c1c; }
+
+    /* ── SUCCESS SCREEN ── */
+    .success-screen { display: none; text-align: center; padding: 60px 20px; }
+    .success-screen .icon { font-size: 52px; margin-bottom: 16px; }
+    .success-screen h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .success-screen p  { font-size: 15px; color: #666; margin-bottom: 28px; line-height: 1.5; }
+    .new-brief-btn {
+      padding: 14px 28px; background: #111; color: #fff; border: none;
+      border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+
+    /* ── SUBMIT BAR — fixed at bottom by default (mobile-first) ── */
+    .submit-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #fff;
+      padding: 12px 16px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+      border-top: 1px solid #ebebeb;
+      z-index: 50;
+    }
+
+    /* ── TOOLBAR — horizontal scroll by default ── */
+    .editor-toolbar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+    .editor-toolbar::-webkit-scrollbar { display: none; }
+    .tb-btn { flex-shrink: 0; }
+    .tb-divider { flex-shrink: 0; }
+
+    /* ── DESKTOP LAYOUT (class applied via JS using screen.width — reliable without viewport meta) ── */
+    .desktop .container { max-width: 600px; margin: 0 auto; padding: 20px 16px 80px; }
+    .desktop .card { border-radius: 14px; margin-bottom: 14px; padding: 20px; }
+    .desktop .submit-bar {
+      position: static;
+      background: transparent;
+      border-top: none;
+      padding: 4px 0 0;
+    }
+    .desktop .editor-toolbar { flex-wrap: wrap; overflow-x: visible; }
+
+    /* ── MODE SWITCHER ── */
+    .mode-switcher {
+      display: flex; gap: 0;
+      background: #1a1a1a;
+      padding: 0 16px 14px;
+    }
+    .mode-btn {
+      flex: 1; padding: 11px 8px;
+      border: none; border-radius: 10px;
+      background: transparent;
+      font-size: 14px; font-weight: 600; color: #555;
+      cursor: pointer; transition: all 0.15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mode-btn.active {
+      background: #fff; color: #111;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+    .mode-btn:not(.active):active { color: #888; }
+
+    /* ── KLR OPTIONAL LABEL ── */
+    .optional-label {
+      font-size: 11px; font-weight: 400; color: #bbb;
+      letter-spacing: 0; text-transform: none; margin-left: 4px;
+    }
+
+    /* ── "No PCR yet" toggle ── */
+    .no-pcr-wrap {
+      display: flex; align-items: flex-start; gap: 11px;
+      background: #f7f7f7; border-radius: 12px;
+      padding: 13px 14px; margin-bottom: 14px;
+      transition: background .2s;
+    }
+    .no-pcr-wrap.active { background: #f0fdf4; }
+    .ios-toggle { position: relative; display: inline-block; width: 44px; height: 26px; flex-shrink: 0; margin-top: 1px; }
+    .ios-toggle input { opacity: 0; width: 0; height: 0; }
+    .ios-slider {
+      position: absolute; cursor: pointer;
+      inset: 0; background: #d1d5db; border-radius: 26px;
+      transition: background .25s;
+    }
+    .ios-slider::before {
+      position: absolute; content: "";
+      height: 20px; width: 20px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+      transition: transform .25s;
+    }
+    .ios-toggle input:checked + .ios-slider { background: #22c55e; }
+    .ios-toggle input:checked + .ios-slider::before { transform: translateX(18px); }
+    .no-pcr-text {
+      font-size: 13px; line-height: 1.5; color: #666;
+      transition: color .2s;
+    }
+    .no-pcr-wrap.active .no-pcr-text { color: #166534; font-weight: 500; }
+
+    /* ── KLR TEXTAREA ── */
+    textarea.klr-textarea {
+      width: 100%; padding: 15px 16px;
+      border: 1.5px solid #e0e0e0; border-radius: 12px;
+      font-size: 17px; font-family: inherit;
+      color: #111; background: #f7f7f7;
+      resize: vertical; min-height: 120px;
+      outline: none; transition: border-color 0.15s, background 0.15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    textarea.klr-textarea:focus { border-color: #111; background: #fff; }
+    textarea.klr-textarea::placeholder { color: #bbb; }
+
+    /* ── LEADERBOARD BOTTOM SHEET ── */
+    .lb-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 300;
+      align-items: flex-end;
+    }
+    .lb-overlay.show { display: flex; }
+    .lb-sheet {
+      background: #fff; border-radius: 20px 20px 0 0;
+      width: 100%; max-height: 82vh; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      animation: slideUp 0.28s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .lb-drag { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 12px auto 4px; }
+    .lb-header {
+      padding: 12px 20px 14px; display: flex; align-items: center;
+      justify-content: space-between; border-bottom: 1px solid #f0f0f0;
+      position: sticky; top: 0; background: #fff; z-index: 1;
+    }
+    .lb-title { font-size: 17px; font-weight: 700; }
+    .lb-subtitle { font-size: 12px; color: #aaa; margin-top: 1px; }
+    .lb-close {
+      width: 32px; height: 32px; background: #f2f2f2; border: none;
+      border-radius: 50%; cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation;
+    }
+    .lb-list { padding: 6px 0 32px; }
+    .lb-row {
+      display: flex; align-items: center; padding: 13px 20px; gap: 14px;
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .lb-rank { font-size: 20px; width: 36px; text-align: center; flex-shrink: 0; font-weight: 700; color: #bbb; }
+    .lb-rank.top { font-size: 22px; color: #111; }
+    .lb-name { flex: 1; font-size: 16px; font-weight: 600; color: #111; }
+    .lb-count { font-size: 12px; color: #aaa; font-weight: 400; margin-top: 2px; }
+    .lb-score-wrap { text-align: right; }
+    .lb-score { font-size: 24px; font-weight: 800; line-height: 1; }
+    .lb-bar-wrap { width: 60px; height: 3px; background: #f0f0f0; border-radius: 2px; margin: 5px 0 0 auto; }
+    .lb-bar { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+    .lb-empty { padding: 48px 20px; text-align: center; color: #aaa; font-size: 15px; }
+    .lb-loading { padding: 48px 20px; text-align: center; color: #aaa; font-size: 15px; }
+    .lb-legend {
+      margin: 0 16px 32px;
+      border: 1px solid #f0f0f0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .lb-legend-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+      text-transform: uppercase; color: #aaa;
+      padding: 12px 14px 8px;
+    }
+    .lb-legend-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; border-top: 1px solid #f5f5f5;
+      font-size: 13px; color: #555;
+    }
+    .lb-legend-row:first-of-type { border-top: none; }
+    .lb-legend-threshold { color: #aaa; font-size: 12px; margin-left: auto; }
+    .lb-badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 20px; margin-left: 7px;
+      vertical-align: middle; line-height: 1.6;
+    }
+    .lb-badge-active   { background: #dbeafe; color: #1d4ed8; }
+    .lb-badge-pro      { background: #ede9fe; color: #6d28d9; }
+    .lb-badge-expert   { background: #fef3c7; color: #b45309; }
+    .lb-badge-elite    { background: #111;    color: #fff; }
+    .lb-badge-master   { background: #e0e7ff; color: #3730a3; }
+    .lb-badge-champion { background: #fee2e2; color: #991b1b; }
+    .lb-badge-legend   { background: #ffd700; color: #78350f; }
+    .lb-badge-icon     { background: #ccfbf1; color: #0f766e; }
+    .lb-badge-titan    { background: #4c1d95; color: #e9d5ff; }
+    .lb-badge-goat     { background: linear-gradient(90deg,#f59e0b,#ef4444); color: #fff; }
+
+    /* Trophy button in header */
+    .header { display: flex; align-items: center; justify-content: space-between; }
+    .header-text h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
+    .header-text p  { font-size: 12px; color: #777; margin-top: 2px; }
+    .trophy-btn {
+      background: rgba(255,255,255,0.12); border: none; border-radius: 10px;
+      color: #fff; font-size: 20px; padding: 8px 10px; cursor: pointer;
+      touch-action: manipulation; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .trophy-btn:active { background: rgba(255,255,255,0.2); }
+
+    /* ── LINK MODAL ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #fff; border-radius: 14px; padding: 20px;
+      width: 90%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    }
+    .modal h3 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+    .modal input { margin-bottom: 12px; font-size: 17px; touch-action: manipulation; }
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-btns button {
+      flex: 1; padding: 11px; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .btn-cancel { background: #f2f2f2; color: #666; }
+    .btn-insert { background: #111; color: #fff; }
+
+    /* ── UPDATE KLR PANEL ── */
+    .klr-update-link {
+      display: block; width: 100%; text-align: center;
+      background: none; border: 1.5px dashed #ddd;
+      color: #888; font-size: 13px; border-radius: 12px;
+      padding: 13px 16px; cursor: pointer; margin-top: 4px; margin-bottom: 18px;
+      transition: border-color .15s, color .15s;
+    }
+    .klr-update-link:hover { border-color: #bbb; color: #444; }
+
+    .klr-update-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: none; color: #888;
+      font-size: 13px; cursor: pointer; padding: 0 0 16px;
+    }
+    .klr-update-back:hover { color: #333; }
+
+    .klr-update-title {
+      font-size: 17px; font-weight: 700; color: #111;
+      letter-spacing: -0.3px; margin-bottom: 18px;
+    }
+
+    .klr-find-btn {
+      display: block; width: 100%;
+      background: #111; color: #fff;
+      border: none; border-radius: 12px;
+      padding: 14px 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer; margin-top: 10px; transition: background .15s;
+    }
+    .klr-find-btn:hover { background: #333; }
+    .klr-find-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    .klr-sub-list { margin-top: 6px; }
+    .klr-sub-item {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 14px 16px; border: 1.5px solid #ebebeb;
+      border-radius: 12px; margin-bottom: 8px; cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .klr-sub-item:hover { border-color: #111; background: #fafafa; }
+    .klr-sub-item.selected { border-color: #111; background: #f5f5f5; }
+    .klr-sub-brand { font-weight: 700; font-size: 14px; color: #111; }
+    .klr-sub-info  { font-size: 12px; color: #777; }
+    .klr-sub-code  { font-size: 11px; color: #bbb; font-family: monospace; }
+
+    .klr-selected-banner {
+      background: #f5f5f5; border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 12px;
+    }
+    .klr-selected-banner strong { font-size: 14px; display: block; margin-bottom: 3px; }
+    .klr-selected-banner span   { font-size: 12px; color: #777; }
+
+    .klr-update-textarea {
+      width: 100%; padding: 14px 16px;
+      border: 1.5px solid #e0e0e0; border-radius: 12px;
+      font-size: 14px; line-height: 1.5; resize: vertical;
+      min-height: 110px; box-sizing: border-box;
+      font-family: inherit; color: #111;
+      -webkit-appearance: none; appearance: none;
+    }
+    .klr-update-textarea:focus { outline: none; border-color: #111; background: #fff; }
+    .klr-update-textarea::placeholder { color: #bbb; }
+
+    .klr-update-submit {
+      display: block; width: 100%;
+      background: #111; color: #fff;
+      border: none; border-radius: 12px;
+      padding: 15px 20px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 10px; transition: background .15s;
+    }
+    .klr-update-submit:hover   { background: #333; }
+    .klr-update-submit:disabled { background: #ccc; cursor: not-allowed; }
+
+    .klr-empty-state {
+      text-align: center; color: #bbb; padding: 28px 16px;
+      font-size: 13px; line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Layout detection — runs before render so no flash of wrong layout -->
+<script>
+  (function() {
+    // Inject viewport meta (Apps Script strips <meta> tags)
+    var m = document.createElement('meta');
+    m.name = 'viewport';
+    m.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0';
+    document.head.appendChild(m);
+
+    // screen.width = real device CSS pixels (e.g. 390 on iPhone, 1440 on MacBook)
+    // Unlike window.innerWidth, this is NOT affected by missing viewport meta
+    if (window.screen.width > 600) {
+      document.documentElement.classList.add('desktop');
+    }
+  })();
+</script>
+
+<div class="header">
+  <div class="header-text">
+    <h1 id="headerTitle">Client Champion Brief Portal</h1>
+    <p id="headerSub">Strategy Department</p>
+  </div>
+  <button class="trophy-btn" onclick="openLeaderboard()" title="Brief Score Leaderboard">🏆</button>
+</div>
+
+<!-- MODE SWITCHER -->
+<div class="mode-switcher">
+  <button class="mode-btn active" id="modeProposal" onclick="switchMode('proposal')">💼 Proposal</button>
+  <button class="mode-btn" id="modeKlr" onclick="switchMode('klr')">📊 Key Learnings & Rec</button>
+</div>
+
+<div class="container" id="formView">
+
+<!-- ══════════════════════════════════════════════
+     PROPOSAL FORM (existing)
+     ══════════════════════════════════════════════ -->
+<div id="proposalSection">
+
+  <!-- SECTION 1: BRIEF DETAILS -->
+  <div class="card">
+    <div class="card-label">Brief Details</div>
+
+    <div class="field">
+      <label>Your Name</label>
+      <div class="select-wrap">
+        <select id="salesName">
+          <option value="">Select your name...</option>
+          <option>Abigail</option><option>Alex</option><option>Aqilah</option>
+          <option>Chelle</option><option>Chloe</option><option>Doreen</option>
+          <option>Edwin</option><option>Emmely</option><option>Fiza</option>
+          <option>Haseef</option><option>Jade</option><option>Janis</option>
+          <option>Jayne</option><option>Jennifer</option><option>Jia Hui</option>
+          <option>Julie</option><option>Justin</option><option>Kean</option>
+          <option>Malini</option><option>Prasna</option><option>Rachel</option>
+          <option>Ridge</option><option>Saiful</option><option>Sarah</option>
+          <option>Seng Sin</option><option>Shu Yee</option><option>Yik Wen</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Strategist</label>
+      <div class="select-wrap">
+        <select id="stratName">
+          <option value="">Assign to...</option>
+          <option>Annette</option><option>Dan</option><option>Ellysa</option>
+          <option>Farah</option><option>Farukh</option><option>Harisha</option>
+          <option>Iman</option><option>Iylia</option><option>Keith</option>
+          <option>Leddy</option><option>Min</option><option>Nadiah</option>
+          <option>Natalie</option><option>Pritib</option><option>Rudy</option>
+          <option>Suresh</option><option>Yaya</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Budget (RM)</label>
+      <input type="number" id="budget" placeholder="e.g. 200000" min="0" step="1000" />
+    </div>
+
+    <div class="field">
+      <label>Type of Deck</label>
+      <div class="select-wrap">
+        <select id="deckType">
+          <option value="">Select type...</option>
+          <option>REV Proposal</option>
+          <option>Revision</option>
+          <option>Topline Ideas</option>
+          <option>Initiative Proposal</option>
+          <option>Brand Plan</option>
+          <option>Brand Review</option>
+          <option>Key Learnings and Recommendation</option>
+          <option>Case Study</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Deadline</label>
+      <input type="date" id="deadline" />
+    </div>
+
+    <div class="preview" id="preview">
+      📁 <strong id="previewText"></strong>
+    </div>
+  </div>
+
+  <!-- SECTION 2: BRIEF CONTENT -->
+  <div class="card">
+    <div class="card-label">Brief Content</div>
+
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="btnEditor" onclick="switchPanel('editor')">Write here</button>
+      <button class="toggle-btn" id="btnLink" onclick="switchPanel('link')">Paste Google Doc link</button>
+    </div>
+
+    <!-- Custom rich text editor -->
+    <div class="panel active" id="panelEditor">
+      <div class="editor-wrap">
+        <div class="editor-toolbar" id="editorToolbar">
+          <button class="tb-btn" title="Bold" onmousedown="fmtCmd(event,'bold')"><b>B</b></button>
+          <button class="tb-btn" title="Italic" onmousedown="fmtCmd(event,'italic')"><i>I</i></button>
+          <button class="tb-btn" title="Underline" onmousedown="fmtCmd(event,'underline')"><u>U</u></button>
+          <div class="tb-divider"></div>
+          <button class="tb-btn" title="Bullet list" onmousedown="fmtCmd(event,'insertUnorderedList')">• ≡</button>
+          <button class="tb-btn" title="Numbered list" onmousedown="fmtCmd(event,'insertOrderedList')">1 ≡</button>
+          <div class="tb-divider"></div>
+          <button class="tb-btn" title="Indent" onmousedown="fmtCmd(event,'indent')" style="font-size:15px;">→</button>
+          <button class="tb-btn" title="Outdent" onmousedown="fmtCmd(event,'outdent')" style="font-size:15px;">←</button>
+          <div class="tb-divider"></div>
+          <button class="tb-btn" title="Insert link" onmousedown="openLinkModal(event)">🔗</button>
+          <button class="tb-btn" title="Remove formatting" onmousedown="fmtCmd(event,'removeFormat')">✕</button>
+        </div>
+        <div class="editor-hints">
+          <span>💡 WhatsApp shortcuts work here: </span>
+          <code>- </code>bullet &nbsp;·&nbsp;
+          <code>*bold*</code> &nbsp;·&nbsp;
+          <code>_italic_</code> &nbsp;·&nbsp;
+          <code>~strike~</code>
+        </div>
+        <div class="editor-body" id="editorBody"
+          contenteditable="true"
+          data-placeholder="Write your brief here — background, objectives, target audience, deliverables..."
+          oninput="onEditorInput()"
+          onkeyup="updateToolbarState()"
+          onmouseup="updateToolbarState()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Google Doc link -->
+    <div class="panel" id="panelLink">
+      <input type="url" id="googleDocUrl"
+        placeholder="https://docs.google.com/document/d/..." />
+    </div>
+  </div>
+
+  <!-- SECTION 3: ATTACH FILES -->
+  <div class="card">
+    <div class="card-label">
+      Attach Files
+      <span style="font-weight:400;color:#ccc;letter-spacing:0;font-size:9px"> — optional</span>
+    </div>
+
+    <input type="file" id="fileInput" multiple
+      accept=".pdf,.pptx,.ppt,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.gif,.mp4,.mov,.zip,.csv"
+      style="display:none" onchange="handleFileSelect(this.files)" />
+
+    <div class="upload-zone" id="uploadZone"
+      onclick="document.getElementById('fileInput').click()"
+      ondragover="onDragOver(event,'uploadZone')" ondragleave="onDragLeave(event,'uploadZone')" ondrop="onDrop(event)">
+      <div class="upload-icon">📎</div>
+      <div class="upload-label">Tap to attach files</div>
+      <div class="upload-sub">PDF, PPTX, Excel, images — max 25MB per file</div>
+    </div>
+
+    <div class="file-list" id="fileList"></div>
+  </div>
+
+</div><!-- /#proposalSection -->
+
+<!-- ══════════════════════════════════════════════
+     KLR FORM (new)
+     ══════════════════════════════════════════════ -->
+<div id="klrSection" style="display:none">
+
+<div id="klrFormPanel">
+  <!-- UPDATE KLR LINK — above Request Details -->
+  <button class="klr-update-link" onclick="switchKlrMode('update')">
+    📎 Need to update a past KLR request?
+  </button>
+
+  <!-- KLR SECTION 1: REQUEST DETAILS -->
+  <div class="card">
+    <div class="card-label">Request Details</div>
+
+    <div class="field">
+      <label>Your Name</label>
+      <div class="select-wrap">
+        <select id="klrRequester">
+          <option value="">Select your name...</option>
+          <option>Ee-Ween</option><option>Isabelle</option><option>Jazree</option>
+          <option>Julynn</option><option>Nicole</option><option>Qing</option>
+          <option>Shu Fern</option><option>Xiao Wen</option><option>Yen Leng</option>
+          <option>Yun Hui</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Assign Strategist</label>
+      <div class="select-wrap">
+        <select id="klrStrat">
+          <option value="">Assign to...</option>
+          <option>Annette</option><option>Dan</option><option>Ellysa</option>
+          <option>Farah</option><option>Farukh</option><option>Harisha</option>
+          <option>Iman</option><option>Iylia</option><option>Keith</option>
+          <option>Leddy</option><option>Min</option><option>Nadiah</option>
+          <option>Natalie</option><option>Pritib</option><option>Rudy</option>
+          <option>Suresh</option><option>Yaya</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Client / Brand</label>
+      <input type="text" id="klrBrand" placeholder="e.g. Blackmores" />
+    </div>
+
+    <div class="field">
+      <label>Campaign Name</label>
+      <input type="text" id="klrCampaign" placeholder="e.g. Genting May Long Weekend" />
+    </div>
+
+    <div class="field">
+      <label>Deadline <span class="optional-label">— Default is 5 working days from today. Move it in if the client needs it sooner.</span></label>
+      <input type="date" id="klrDeadline" />
+    </div>
+  </div>
+
+  <!-- KLR SECTION 2: POST CAMPAIGN REPORT -->
+  <div class="card">
+    <div class="card-label">Post Campaign Report</div>
+
+    <!-- "No PCR yet" toggle -->
+    <div class="no-pcr-wrap" id="klrNoPcrWrap">
+      <label class="ios-toggle" for="klrNoPcrToggle">
+        <input type="checkbox" id="klrNoPcrToggle" onchange="toggleKlrNoPcr(this.checked)" />
+        <span class="ios-slider"></span>
+      </label>
+      <span class="no-pcr-text">Campaign still running — PCR will follow once it wraps up. I'll update this request after.</span>
+    </div>
+
+    <!-- PCR upload / link (hidden when toggle is ON) -->
+    <div id="klrPcrContent">
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="klrBtnNotes" onclick="switchKlrPanel('notes')">Attach PPTX Format</button>
+        <button class="toggle-btn" id="klrBtnLink" onclick="switchKlrPanel('link')">Paste Google Drive/Slides Link</button>
+      </div>
+
+      <div class="panel active" id="klrPanelNotes">
+        <input type="file" id="klrPcrFileInput" multiple
+          accept=".pdf,.pptx,.ppt"
+          style="display:none" onchange="handleKlrPcrFileSelect(this.files)" />
+        <div class="upload-zone" id="klrPcrUploadZone"
+          onclick="document.getElementById('klrPcrFileInput').click()"
+          ondragover="onDragOver(event,'klrPcrUploadZone')" ondragleave="onDragLeave(event,'klrPcrUploadZone')" ondrop="onKlrPcrDrop(event)">
+          <div class="upload-icon">📊</div>
+          <div class="upload-label">Tap to attach PCR file</div>
+          <div class="upload-sub">PPTX or PDF — max 25MB</div>
+        </div>
+        <div class="file-list" id="klrPcrFileList"></div>
+      </div>
+
+      <div class="panel" id="klrPanelLink">
+        <input type="url" id="klrPcrLink"
+          placeholder="Paste Google Slides or Drive link..." />
+      </div>
+    </div><!-- /#klrPcrContent -->
+  </div>
+
+  <!-- KLR SECTION 3: CLIENT QUESTIONS -->
+  <div class="card">
+    <div class="card-label">Client's Specific Questions and/or additional context <span class="optional-label">— optional</span></div>
+    <div class="editor-wrap">
+      <div class="editor-toolbar" id="klrQEditorToolbar">
+        <button class="tb-btn" title="Bold" onmousedown="fmtKlrQ(event,'bold')"><b>B</b></button>
+        <button class="tb-btn" title="Italic" onmousedown="fmtKlrQ(event,'italic')"><i>I</i></button>
+        <button class="tb-btn" title="Underline" onmousedown="fmtKlrQ(event,'underline')"><u>U</u></button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" title="Bullet list" onmousedown="fmtKlrQ(event,'insertUnorderedList')">• ≡</button>
+        <button class="tb-btn" title="Numbered list" onmousedown="fmtKlrQ(event,'insertOrderedList')">1 ≡</button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" title="Indent" onmousedown="fmtKlrQ(event,'indent')" style="font-size:15px;">→</button>
+        <button class="tb-btn" title="Outdent" onmousedown="fmtKlrQ(event,'outdent')" style="font-size:15px;">←</button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" title="Insert link" onmousedown="openLinkModal(event,'klrQEditorBody')">🔗</button>
+        <button class="tb-btn" title="Remove formatting" onmousedown="fmtKlrQ(event,'removeFormat')">✕</button>
+      </div>
+      <div class="editor-hints">
+        <span>💡 Paste images directly here · </span>
+        <code>*bold*</code> &nbsp;·&nbsp; <code>_italic_</code> &nbsp;·&nbsp; <code>- </code>bullet
+      </div>
+      <div class="editor-body" id="klrQEditorBody"
+        contenteditable="true"
+        data-placeholder="Copy and paste the client's questions here, include any context for the strategist, or paste an image directly..."
+        oninput="onKlrQEditorInput()"
+        onkeyup="updateKlrQToolbarState()"
+        onmouseup="updateKlrQToolbarState()">
+      </div>
+    </div>
+  </div>
+
+  <!-- KLR SECTION 4: ATTACH FILES -->
+  <div class="card">
+    <div class="card-label">
+      Attach Supporting Files Only
+      <span style="font-weight:400;color:#ccc;letter-spacing:0;font-size:9px"> — optional</span>
+    </div>
+
+    <input type="file" id="klrFileInput" multiple
+      accept=".pdf,.pptx,.ppt,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.zip,.csv"
+      style="display:none" onchange="handleKlrFileSelect(this.files)" />
+
+    <div class="upload-zone" id="klrUploadZone"
+      onclick="document.getElementById('klrFileInput').click()"
+      ondragover="onDragOver(event,'klrUploadZone')" ondragleave="onDragLeave(event,'klrUploadZone')" ondrop="onKlrDrop(event)">
+      <div class="upload-icon">📊</div>
+      <div class="upload-label">Tap to attach supporting files</div>
+      <div class="upload-sub">PDF, Excel, images, ZIP — max 25MB per file</div>
+    </div>
+
+    <div class="file-list" id="klrFileList"></div>
+  </div>
+
+
+</div><!-- /#klrFormPanel -->
+
+<!-- ── UPDATE KLR PANEL ── -->
+<div id="klrUpdatePanel" style="display:none">
+
+  <button class="klr-update-back" onclick="switchKlrMode('form')">
+    ← Back to KLR Form
+  </button>
+
+  <div class="klr-update-title">Update KLR Request</div>
+
+  <!-- STEP 1: NAME + SEARCH -->
+  <div id="klrUpdateStep1" class="card">
+    <div class="card-label">Who are you?</div>
+    <div class="field">
+      <div class="select-wrap">
+        <select id="klrUpdateRequester" onchange="document.getElementById('klrFindBtn').disabled=!this.value">
+          <option value="">Select your name...</option>
+          <option>Ee-Ween</option><option>Isabelle</option><option>Jazree</option>
+          <option>Julynn</option><option>Nicole</option><option>Qing</option>
+          <option>Shu Fern</option><option>Xiao Wen</option><option>Yen Leng</option>
+          <option>Yun Hui</option>
+        </select>
+      </div>
+    </div>
+    <button class="klr-find-btn" id="klrFindBtn" disabled onclick="fetchKlrSubmissions()">
+      🔍 Find My KLRs
+    </button>
+  </div>
+
+  <!-- STEP 2: SUBMISSIONS LIST -->
+  <div id="klrUpdateStep2" style="display:none">
+    <div class="card-label" style="margin:16px 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#aaa;">Your KLR Requests</div>
+    <div class="klr-sub-list" id="klrSubmissionsList"></div>
+  </div>
+
+  <!-- STEP 3: CONTEXT + FILES -->
+  <div id="klrUpdateStep3" style="display:none">
+    <div class="klr-selected-banner">
+      <strong id="klrUpdateSelectedTitle"></strong>
+      <span id="klrUpdateSelectedMeta"></span>
+    </div>
+
+    <!-- Additional Context — rich text editor -->
+    <div class="card">
+      <div class="card-label">Additional Context <span class="optional-label">— optional</span></div>
+      <div class="editor-wrap">
+        <div class="editor-toolbar" id="klrUpdateEditorToolbar">
+          <button class="tb-btn" title="Bold" onmousedown="fmtKlrUpd(event,'bold')"><b>B</b></button>
+          <button class="tb-btn" title="Italic" onmousedown="fmtKlrUpd(event,'italic')"><i>I</i></button>
+          <button class="tb-btn" title="Underline" onmousedown="fmtKlrUpd(event,'underline')"><u>U</u></button>
+          <div class="tb-divider"></div>
+          <button class="tb-btn" title="Bullet list" onmousedown="fmtKlrUpd(event,'insertUnorderedList')">• ≡</button>
+          <button class="tb-btn" title="Numbered list" onmousedown="fmtKlrUpd(event,'insertOrderedList')">1 ≡</button>
+          <div class="tb-divider"></div>
+          <button class="tb-btn" title="Indent" onmousedown="fmtKlrUpd(event,'indent')" style="font-size:15px;">→</button>
+          <button class="tb-btn" title="Outdent" onmousedown="fmtKlrUpd(event,'outdent')" style="font-size:15px;">←</button>
+          <div class="tb-divider"></div>
+          <button class="tb-btn" title="Insert link" onmousedown="openLinkModal(event,'klrUpdateEditorBody')">🔗</button>
+          <button class="tb-btn" title="Remove formatting" onmousedown="fmtKlrUpd(event,'removeFormat')">✕</button>
+        </div>
+        <div class="editor-hints">
+          <span>💡 Paste images directly here · </span>
+          <code>*bold*</code> &nbsp;·&nbsp; <code>_italic_</code> &nbsp;·&nbsp; <code>- </code>bullet
+        </div>
+        <div class="editor-body" id="klrUpdateEditorBody"
+          contenteditable="true"
+          data-placeholder="Describe what's changed, add questions, or paste extra notes for the strategist..."
+          oninput="onKlrUpdateEditorInput()"
+          onkeyup="updateKlrUpdateToolbarState()"
+          onmouseup="updateKlrUpdateToolbarState()">
+        </div>
+      </div>
+    </div>
+
+    <!-- PCR — same toggle as main form (Attach / Paste Link) -->
+    <div class="card">
+      <div class="card-label">Post Campaign Report (PCR) <span class="optional-label">— optional</span></div>
+
+      <!-- Notice when PCR already in sheet -->
+      <div id="klrUpdatePcrNotice" style="display:none;font-size:12px;color:#059669;background:#f0fdf4;border-radius:8px;padding:9px 12px;margin-bottom:10px;">
+        ✅ PCR already on file. Any PCR you add here will be included in the update doc.
+      </div>
+
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="klrUpdBtnNotes" onclick="switchKlrUpdatePcr('notes')">Attach PPTX Format</button>
+        <button class="toggle-btn"        id="klrUpdBtnLink"  onclick="switchKlrUpdatePcr('link')">Paste Google Drive/Slides Link</button>
+      </div>
+
+      <div class="panel active" id="klrUpdPanelNotes">
+        <input type="file" id="klrUpdatePcrFileInput" multiple
+          accept=".pdf,.pptx,.ppt,.key,.pps"
+          style="display:none" onchange="handleKlrUpdatePcrFileSelect(this.files)" />
+        <div class="upload-zone" id="klrUpdatePcrUploadZone"
+          onclick="document.getElementById('klrUpdatePcrFileInput').click()"
+          ondragover="onDragOver(event,'klrUpdatePcrUploadZone')"
+          ondragleave="onDragLeave(event,'klrUpdatePcrUploadZone')"
+          ondrop="onKlrUpdatePcrDrop(event)">
+          <div class="upload-icon">📊</div>
+          <div class="upload-label">Tap to attach PCR file(s)</div>
+          <div class="upload-sub">PDF, PPTX, KEY — max 25MB per file</div>
+        </div>
+        <div class="file-list" id="klrUpdatePcrFileList"></div>
+      </div>
+
+      <div class="panel" id="klrUpdPanelLink">
+        <input type="url" id="klrUpdatePcrLink"
+          placeholder="Paste Google Slides / Drive sharing link..."
+          style="width:100%;padding:12px 14px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:14px;box-sizing:border-box;outline:none;" />
+      </div>
+    </div>
+
+    <!-- Supporting Files -->
+    <div class="card">
+      <div class="card-label">Attach Supporting Files <span class="optional-label">— optional</span></div>
+
+      <input type="file" id="klrUpdateFileInput" multiple
+        accept=".pdf,.pptx,.ppt,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.zip,.csv"
+        style="display:none" onchange="handleKlrUpdateFileSelect(this.files)" />
+
+      <div class="upload-zone" id="klrUpdateUploadZone"
+        onclick="document.getElementById('klrUpdateFileInput').click()"
+        ondragover="onDragOver(event,'klrUpdateUploadZone')"
+        ondragleave="onDragLeave(event,'klrUpdateUploadZone')"
+        ondrop="onKlrUpdateDrop(event)">
+        <div class="upload-icon">📂</div>
+        <div class="upload-label">Tap to attach supporting files</div>
+        <div class="upload-sub">PDF, PPTX, images, ZIP — max 25MB per file</div>
+      </div>
+      <div class="file-list" id="klrUpdateFileList"></div>
+    </div>
+
+    <button class="klr-update-submit" id="klrUpdateSubmitBtn" onclick="submitKlrUpdate()">
+      Send Update to Strategist
+    </button>
+  </div>
+
+</div><!-- /#klrUpdatePanel -->
+
+</div><!-- /#klrSection -->
+
+  <div class="submit-bar">
+    <button class="submit-btn" id="submitBtn" onclick="submitForm()">Submit Brief</button>
+    <div class="loading-state" id="loadingMsg">⏳ Uploading and submitting...</div>
+    <div class="progress-bar-wrap" id="progressWrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SUCCESS -->
+<div class="container success-screen" id="successView">
+  <div class="icon" id="successIcon">✅</div>
+  <h2 id="successTitle">Brief submitted!</h2>
+  <p id="successMsg">Your brief has been sent to the strategy team.<br>You'll receive a Google Chat notification shortly.</p>
+  <button class="new-brief-btn" onclick="resetForm()">Submit another</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Leaderboard bottom sheet -->
+<div class="lb-overlay" id="lbOverlay" onclick="closeLbIfBackground(event)">
+  <div class="lb-sheet" id="lbSheet">
+    <div class="lb-drag"></div>
+    <div class="lb-header">
+      <div>
+        <div class="lb-title">🏆 Brief Score Leaderboard</div>
+        <div class="lb-subtitle">Adjusted score — rewards consistency over volume</div>
+      </div>
+      <button class="lb-close" onclick="closeLeaderboard()">✕</button>
+    </div>
+    <div class="lb-list" id="lbContent">
+      <div class="lb-loading">Loading...</div>
+    </div>
+
+    <div class="lb-legend">
+      <div class="lb-legend-title">Badge Guide</div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-active">Active</span>   Consistently submitting <span class="lb-legend-threshold">5+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-pro">Pro</span>       Building strong momentum <span class="lb-legend-threshold">10+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-expert">Expert</span>     Experienced and reliable <span class="lb-legend-threshold">15+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-elite">Elite</span>      Top-tier output <span class="lb-legend-threshold">20+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-master">Master</span>     Exceptional commitment <span class="lb-legend-threshold">30+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-champion">Champion</span>   Going above and beyond <span class="lb-legend-threshold">40+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-legend">Legend</span>     Rare-level dedication <span class="lb-legend-threshold">50+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-icon">Icon</span>       An inspiration to the team <span class="lb-legend-threshold">60+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-titan">Titan</span>      Unmatched volume &amp; quality <span class="lb-legend-threshold">70+ briefs</span></div>
+      <div class="lb-legend-row"><span class="lb-badge lb-badge-goat">GOAT</span>       Greatest of all time <span class="lb-legend-threshold">80+ briefs</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Link insert modal -->
+<div class="modal-overlay" id="linkModal">
+  <div class="modal">
+    <h3>Insert link</h3>
+    <input type="url" id="linkUrl" placeholder="https://..." />
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeLinkModal()">Cancel</button>
+      <button class="btn-insert" onclick="insertLink()">Insert</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── PANEL TOGGLE ──
+  function switchPanel(mode) {
+    document.getElementById('btnEditor').classList.toggle('active', mode === 'editor');
+    document.getElementById('btnLink').classList.toggle('active', mode === 'link');
+    document.getElementById('panelEditor').classList.toggle('active', mode === 'editor');
+    document.getElementById('panelLink').classList.toggle('active', mode === 'link');
+  }
+
+  // ── FILENAME PREVIEW ──
+  function updatePreview() {
+    var s=document.getElementById('salesName').value,
+        st=document.getElementById('stratName').value,
+        b=document.getElementById('budget').value,
+        d=document.getElementById('deckType').value,
+        dl=document.getElementById('deadline').value,
+        el=document.getElementById('preview');
+    if(s&&st&&b&&d&&dl){
+      var p=dl.split('-');
+      document.getElementById('previewText').textContent=s+'_'+st+'_'+b+'_'+d+'_'+p[2]+'/'+p[1]+'/'+p[0];
+      el.style.display='block';
+    } else { el.style.display='none'; }
+  }
+  ['salesName','stratName','budget','deckType','deadline'].forEach(function(id){
+    var el=document.getElementById(id);
+    el.addEventListener('change',updatePreview);
+    el.addEventListener('input',updatePreview);
+  });
+
+  // ── RICH TEXT EDITOR ──
+  function fmtCmd(e, cmd) {
+    e.preventDefault(); // prevent losing focus
+    document.getElementById('editorBody').focus();
+    document.execCommand(cmd, false, null);
+    updateToolbarState();
+  }
+
+  // ── WHATSAPP-STYLE MARKDOWN SHORTCUTS ──
+  document.getElementById('editorBody').addEventListener('keydown', function(e) {
+    if (e.key !== ' ' && e.key !== 'Enter') return;
+
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.getRangeAt(0).collapsed) return;
+
+    var range = sel.getRangeAt(0);
+    var node = range.startContainer;
+    if (node.nodeType !== 3) return; // text nodes only
+
+    var offset = range.startOffset;
+    var textBefore = node.textContent.substring(0, offset);
+
+    // ── "- " at line start → bullet list ──
+    if (e.key === ' ' && textBefore === '-') {
+      e.preventDefault();
+      var delRange = document.createRange();
+      delRange.setStart(node, 0);
+      delRange.setEnd(node, 1);
+      sel.removeAllRanges();
+      sel.addRange(delRange);
+      document.execCommand('delete');
+      document.execCommand('insertUnorderedList');
+      return;
+    }
+
+    // ── Inline format patterns ──
+    var patterns = [
+      { re: /\*([^*]+)\*$/, cmd: 'bold' },
+      { re: /_([^_]+)_$/,   cmd: 'italic' },
+      { re: /~([^~]+)~$/,   cmd: 'strikeThrough' }
+    ];
+
+    for (var i = 0; i < patterns.length; i++) {
+      var m = textBefore.match(patterns[i].re);
+      if (!m) continue;
+
+      e.preventDefault();
+      var fullMatch = m[0];     // e.g. *hello*
+      var innerText = m[1];     // e.g. hello
+      var startPos = offset - fullMatch.length;
+
+      // Select and replace the full pattern (*hello*) with plain inner text
+      var replRange = document.createRange();
+      replRange.setStart(node, startPos);
+      replRange.setEnd(node, offset);
+      sel.removeAllRanges();
+      sel.addRange(replRange);
+      document.execCommand('insertText', false, innerText);
+
+      // Now select the inner text we just inserted and apply formatting
+      var cur = sel.getRangeAt(0);
+      var curNode = cur.startContainer;
+      var curOffset = cur.startOffset;
+      var fmtRange = document.createRange();
+      fmtRange.setStart(curNode, curOffset - innerText.length);
+      fmtRange.setEnd(curNode, curOffset);
+      sel.removeAllRanges();
+      sel.addRange(fmtRange);
+      document.execCommand(patterns[i].cmd, false, null);
+
+      // Collapse cursor to end of formatted text
+      var endRange = sel.getRangeAt(0);
+      var collapse = document.createRange();
+      collapse.setStart(endRange.endContainer, endRange.endOffset);
+      collapse.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(collapse);
+
+      // Turn off the format so subsequent typing returns to normal
+      if (document.queryCommandState(patterns[i].cmd)) {
+        document.execCommand(patterns[i].cmd, false, null);
+      }
+
+      document.execCommand('insertText', false, ' ');
+      return;
+    }
+  });
+
+  function updateToolbarState() {
+    var cmds = { bold:'bold', italic:'italic', underline:'underline' };
+    document.querySelectorAll('.tb-btn').forEach(function(btn) {
+      var title = btn.getAttribute('title');
+      if(title === 'Bold')      btn.classList.toggle('active', document.queryCommandState('bold'));
+      if(title === 'Italic')    btn.classList.toggle('active', document.queryCommandState('italic'));
+      if(title === 'Underline') btn.classList.toggle('active', document.queryCommandState('underline'));
+    });
+  }
+
+  function onEditorInput() {
+    // Clear empty paragraphs left by contenteditable
+    var body = document.getElementById('editorBody');
+    if(body.innerHTML === '<br>') body.innerHTML = '';
+  }
+
+  // ── KLR QUESTIONS RICH EDITOR ──
+  function fmtKlrQ(e, cmd) {
+    e.preventDefault();
+    document.getElementById('klrQEditorBody').focus();
+    document.execCommand(cmd, false, null);
+    updateKlrQToolbarState();
+  }
+  function updateKlrQToolbarState() {
+    document.querySelectorAll('#klrQEditorToolbar .tb-btn').forEach(function(btn) {
+      var title = btn.getAttribute('title');
+      if(title === 'Bold')      btn.classList.toggle('active', document.queryCommandState('bold'));
+      if(title === 'Italic')    btn.classList.toggle('active', document.queryCommandState('italic'));
+      if(title === 'Underline') btn.classList.toggle('active', document.queryCommandState('underline'));
+    });
+  }
+  function onKlrQEditorInput() {
+    var body = document.getElementById('klrQEditorBody');
+    if(body.innerHTML === '<br>') body.innerHTML = '';
+  }
+
+  // WhatsApp shortcuts for KLR editor
+  document.addEventListener('DOMContentLoaded', function() {
+    var klrQBody = document.getElementById('klrQEditorBody');
+    if (!klrQBody) return;
+
+    // Image paste support
+    klrQBody.addEventListener('paste', function(e) {
+      var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          e.preventDefault();
+          var blob = items[i].getAsFile();
+          var reader = new FileReader();
+          reader.onload = function(ev) {
+            klrQBody.focus();
+            document.execCommand('insertHTML', false,
+              '<img src="' + ev.target.result + '" style="max-width:100%;border-radius:8px;margin:8px 0;display:block;" />');
+          };
+          reader.readAsDataURL(blob);
+          return;
+        }
+      }
+    });
+
+    // Image drag-drop support
+    klrQBody.addEventListener('drop', function(e) {
+      var files = e.dataTransfer ? e.dataTransfer.files : [];
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].type.indexOf('image') !== -1) {
+          e.preventDefault();
+          (function(file) {
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+              klrQBody.focus();
+              document.execCommand('insertHTML', false,
+                '<img src="' + ev.target.result + '" style="max-width:100%;border-radius:8px;margin:8px 0;display:block;" />');
+            };
+            reader.readAsDataURL(file);
+          })(files[i]);
+        }
+      }
+    });
+
+    // WhatsApp-style markdown shortcuts
+    klrQBody.addEventListener('keydown', function(e) {
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      var sel = window.getSelection();
+      if (!sel || !sel.rangeCount || !sel.getRangeAt(0).collapsed) return;
+      var range = sel.getRangeAt(0);
+      var node = range.startContainer;
+      if (node.nodeType !== 3) return;
+      var offset = range.startOffset;
+      var textBefore = node.textContent.substring(0, offset);
+
+      if (e.key === ' ' && textBefore === '-') {
+        e.preventDefault();
+        var delRange = document.createRange();
+        delRange.setStart(node, 0); delRange.setEnd(node, 1);
+        sel.removeAllRanges(); sel.addRange(delRange);
+        document.execCommand('delete');
+        document.execCommand('insertUnorderedList');
+        return;
+      }
+      var patterns = [
+        { re: /\*([^*]+)\*$/, cmd: 'bold' },
+        { re: /_([^_]+)_$/,   cmd: 'italic' },
+        { re: /~([^~]+)~$/,   cmd: 'strikeThrough' }
+      ];
+      for (var j = 0; j < patterns.length; j++) {
+        var m = textBefore.match(patterns[j].re);
+        if (!m) continue;
+        e.preventDefault();
+        var fullMatch = m[0]; var innerText = m[1];
+        var startPos = offset - fullMatch.length;
+        var replRange = document.createRange();
+        replRange.setStart(node, startPos); replRange.setEnd(node, offset);
+        sel.removeAllRanges(); sel.addRange(replRange);
+        document.execCommand('insertText', false, innerText);
+        var cur = sel.getRangeAt(0);
+        var curNode = cur.startContainer; var curOff = cur.startOffset;
+        var fmtRange = document.createRange();
+        fmtRange.setStart(curNode, curOff - innerText.length); fmtRange.setEnd(curNode, curOff);
+        sel.removeAllRanges(); sel.addRange(fmtRange);
+        document.execCommand(patterns[j].cmd, false, null);
+        var endRange = sel.getRangeAt(0);
+        var collapse = document.createRange();
+        collapse.setStart(endRange.endContainer, endRange.endOffset); collapse.collapse(true);
+        sel.removeAllRanges(); sel.addRange(collapse);
+        if (document.queryCommandState(patterns[j].cmd)) document.execCommand(patterns[j].cmd, false, null);
+        document.execCommand('insertText', false, ' ');
+        return;
+      }
+    });
+  });
+
+  // ── LINK MODAL ──
+  var savedRange = null;
+  var _activeLinkEditorId = 'editorBody';
+  function openLinkModal(e, editorId) {
+    e.preventDefault();
+    _activeLinkEditorId = editorId || 'editorBody';
+    // Save current selection before modal opens
+    var sel = window.getSelection();
+    if(sel && sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange();
+    document.getElementById('linkUrl').value = '';
+    document.getElementById('linkModal').classList.add('show');
+    setTimeout(function(){ document.getElementById('linkUrl').focus(); }, 100);
+  }
+  function closeLinkModal() {
+    document.getElementById('linkModal').classList.remove('show');
+    savedRange = null;
+  }
+  function insertLink() {
+    var url = document.getElementById('linkUrl').value.trim();
+    if(!url) { closeLinkModal(); return; }
+    if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    closeLinkModal();
+    document.getElementById(_activeLinkEditorId).focus();
+    if(savedRange) {
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }
+    document.execCommand('createLink', false, url);
+  }
+  // Close modal on overlay click
+  document.getElementById('linkModal').addEventListener('click', function(e){
+    if(e.target === this) closeLinkModal();
+  });
+  // Insert link on Enter key
+  document.getElementById('linkUrl').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') insertLink();
+  });
+
+  // ── FILE HANDLING ──
+  var selectedFiles = [];
+  var MAX = 25 * 1024 * 1024;
+
+  function getIcon(name) {
+    var e=name.split('.').pop().toLowerCase(),
+        m={pdf:'📄',pptx:'📊',ppt:'📊',xlsx:'📗',xls:'📗',docx:'📝',doc:'📝',
+           jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',mp4:'🎥',mov:'🎥',zip:'🗜️',csv:'📋'};
+    return m[e]||'📎';
+  }
+  function fmtSize(b) {
+    if(b<1024) return b+' B';
+    if(b<1048576) return (b/1024).toFixed(1)+' KB';
+    return (b/1048576).toFixed(1)+' MB';
+  }
+  function renderFiles() {
+    var list=document.getElementById('fileList'); list.innerHTML='';
+    selectedFiles.forEach(function(f,i){
+      var big=f.size>MAX, chip=document.createElement('div');
+      chip.className='file-chip';
+      chip.innerHTML='<div class="file-chip-icon">'+getIcon(f.name)+'</div>'
+        +'<div class="file-chip-info">'
+        +'<div class="file-chip-name">'+f.name+'</div>'
+        +'<div class="file-chip-size'+(big?' file-size-warning':'')+'">'+fmtSize(f.size)+(big?' — too large (max 25MB)':'')+'</div>'
+        +'</div>'
+        +'<button class="file-chip-remove" onclick="removeFile('+i+')">×</button>';
+      list.appendChild(chip);
+    });
+  }
+  function handleFileSelect(files) {
+    for(var i=0;i<files.length;i++) selectedFiles.push(files[i]);
+    renderFiles();
+    document.getElementById('fileInput').value='';
+  }
+  function removeFile(i) { selectedFiles.splice(i,1); renderFiles(); }
+  function onDrop(e) { e.preventDefault(); document.getElementById('uploadZone').classList.remove('dragover'); handleFileSelect(e.dataTransfer.files); }
+
+  function readFileAsBase64(file) {
+    return new Promise(function(resolve,reject){
+      var r=new FileReader();
+      r.onload=function(e){ resolve({name:file.name,data:e.target.result.split(',')[1],mimeType:file.type||'application/octet-stream',size:file.size}); };
+      r.onerror=function(){ reject(new Error('Failed to read '+file.name)); };
+      r.readAsDataURL(file);
+    });
+  }
+
+  // ── TOAST ──
+  var toastTimer;
+  function showToast(msg,type) {
+    clearTimeout(toastTimer);
+    var t=document.getElementById('toast');
+    t.textContent=msg; t.className='toast '+(type||'');
+    t.offsetHeight; t.classList.add('show');
+    toastTimer=setTimeout(function(){ t.classList.remove('show'); },4000);
+  }
+
+  // ── SUBMIT ──
+  function submitForm() {
+    if (_mode === 'klr') { submitKlrForm(); return; }
+    var sn=document.getElementById('salesName').value.trim(),
+        st=document.getElementById('stratName').value.trim(),
+        b=document.getElementById('budget').value.trim(),
+        dt=document.getElementById('deckType').value.trim(),
+        dl=document.getElementById('deadline').value;
+
+    if(!sn){showToast('Please select your name.','error');return;}
+    if(!st){showToast('Please select a strategist.','error');return;}
+    if(!b){showToast('Please enter the budget.','error');return;}
+    if(!dt){showToast('Please select a deck type.','error');return;}
+    if(!dl){showToast('Please set a deadline.','error');return;}
+
+    var isEditor=document.getElementById('panelEditor').classList.contains('active');
+    var editorBody=document.getElementById('editorBody');
+    var editorText=(editorBody.innerText||'').trim();
+    var editorHtml=editorBody.innerHTML;
+    var gdocUrl=document.getElementById('googleDocUrl').value.trim();
+
+    if(isEditor&&editorText.length<10){showToast('Please write your brief content.','error');return;}
+    if(!isEditor&&!gdocUrl){showToast('Please paste a Google Doc link.','error');return;}
+    if(!isEditor&&!gdocUrl.includes('docs.google.com')){showToast("That doesn't look like a Google Doc link.",'error');return;}
+
+    var oversized=selectedFiles.filter(function(f){return f.size>MAX;});
+    if(oversized.length>0){showToast('Please remove files over 25MB.','error');return;}
+
+    var p=dl.split('-');
+    var formData={
+      salesName:sn, stratName:st, budget:b, deckType:dt,
+      deadline:p[2]+'/'+p[1]+'/'+p[0],
+      briefType:isEditor?'editor':'link',
+      quillHtml:isEditor?editorHtml:'',
+      googleDocUrl:isEditor?'':gdocUrl
+    };
+
+    document.getElementById('submitBtn').disabled=true;
+    document.getElementById('loadingMsg').style.display='block';
+    if(selectedFiles.length>0){ document.getElementById('progressWrap').style.display='block'; document.getElementById('progressBar').style.width='30%'; }
+
+    Promise.all(selectedFiles.map(readFileAsBase64)).then(function(attachments){
+      formData.attachments=attachments;
+      if(attachments.length>0) document.getElementById('progressBar').style.width='70%';
+      google.script.run
+        .withSuccessHandler(function(r){
+          document.getElementById('submitBtn').disabled=false;
+          document.getElementById('loadingMsg').style.display='none';
+          document.getElementById('progressWrap').style.display='none';
+          if(r&&r.success){
+            document.getElementById('formView').style.display='none';
+            document.getElementById('successView').style.display='block';
+          } else { showToast('Error: '+(r?r.error:'Unknown error'),'error'); }
+        })
+        .withFailureHandler(function(){
+          document.getElementById('submitBtn').disabled=false;
+          document.getElementById('loadingMsg').style.display='none';
+          document.getElementById('progressWrap').style.display='none';
+          showToast('Submission failed. Please try again.','error');
+        })
+        .handleBriefSubmission(formData);
+    }).catch(function(){
+      document.getElementById('submitBtn').disabled=false;
+      document.getElementById('loadingMsg').style.display='none';
+      showToast('Could not read a file. Please try again.','error');
+    });
+  }
+
+  // ── LEADERBOARD ──
+  function openLeaderboard() {
+    document.getElementById('lbOverlay').classList.add('show');
+    document.getElementById('lbContent').innerHTML = '<div class="lb-loading">⏳ Loading scores...</div>';
+    google.script.run
+      .withSuccessHandler(renderLeaderboard)
+      .withFailureHandler(function() {
+        document.getElementById('lbContent').innerHTML = '<div class="lb-empty">Could not load scores. Check back later.</div>';
+      })
+      .getLeaderboardData();
+  }
+
+  function closeLeaderboard() {
+    document.getElementById('lbOverlay').classList.remove('show');
+  }
+
+  function closeLbIfBackground(e) {
+    if (e.target === document.getElementById('lbOverlay')) closeLeaderboard();
+  }
+
+  function renderLeaderboard(data) {
+    if (!data || (data.error === 'column_not_found')) {
+      document.getElementById('lbContent').innerHTML = '<div class="lb-empty">⚠️ Could not find the "Brief Score" column. Check Apps Script logs for details.</div>';
+      return;
+    }
+    if (!data.length) {
+      document.getElementById('lbContent').innerHTML = '<div class="lb-empty">No scores yet. Submit some briefs first!</div>';
+      return;
+    }
+    var medals = ['🥇', '🥈', '🥉'];
+    function getBadge(count) {
+      if (count >= 80) return '<span class="lb-badge lb-badge-goat">GOAT</span>';
+      if (count >= 70) return '<span class="lb-badge lb-badge-titan">Titan</span>';
+      if (count >= 60) return '<span class="lb-badge lb-badge-icon">Icon</span>';
+      if (count >= 50) return '<span class="lb-badge lb-badge-legend">Legend</span>';
+      if (count >= 40) return '<span class="lb-badge lb-badge-champion">Champion</span>';
+      if (count >= 30) return '<span class="lb-badge lb-badge-master">Master</span>';
+      if (count >= 20) return '<span class="lb-badge lb-badge-elite">Elite</span>';
+      if (count >= 15) return '<span class="lb-badge lb-badge-expert">Expert</span>';
+      if (count >= 10) return '<span class="lb-badge lb-badge-pro">Pro</span>';
+      if (count >= 5)  return '<span class="lb-badge lb-badge-active">Active</span>';
+      return '';
+    }
+
+    var html = '';
+    data.forEach(function(p, i) {
+      var isTop = i < 3;
+      var rank  = isTop ? medals[i] : (i + 1);
+      var color = p.avg >= 7.5 ? '#16a34a' : p.avg >= 6 ? '#d97706' : '#dc2626';
+      var bar   = Math.round((p.avg / 10) * 100);
+      var rawLabel = p.raw ? '<span style="font-size:11px;color:#bbb;margin-left:4px;">(' + p.raw.toFixed(1) + ' raw)</span>' : '';
+      html += '<div class="lb-row">'
+        + '<div class="lb-rank' + (isTop ? ' top' : '') + '">' + rank + '</div>'
+        + '<div class="lb-name">' + p.name + getBadge(p.count) + '<div class="lb-count">' + p.count + ' brief' + (p.count !== 1 ? 's' : '') + '</div></div>'
+        + '<div class="lb-score-wrap">'
+        +   '<div class="lb-score" style="color:' + color + '">' + p.avg.toFixed(1) + rawLabel + '</div>'
+        +   '<div class="lb-bar-wrap"><div class="lb-bar" style="width:' + bar + '%;background:' + color + '"></div></div>'
+        + '</div>'
+        + '</div>';
+    });
+    document.getElementById('lbContent').innerHTML = html;
+  }
+
+  // ── RESET ──
+  function resetForm() {
+    document.getElementById('formView').style.display='block';
+    document.getElementById('successView').style.display='none';
+    ['salesName','stratName','budget','deckType','deadline'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('preview').style.display='none';
+    document.getElementById('editorBody').innerHTML='';
+    document.getElementById('googleDocUrl').value='';
+    selectedFiles=[]; renderFiles();
+    document.getElementById('fileInput').value='';
+    switchPanel('editor');
+    // Reset KLR fields too
+    klrNoPcr = false;
+    var noPcrToggle = document.getElementById('klrNoPcrToggle');
+    if (noPcrToggle) noPcrToggle.checked = false;
+    var noPcrWrap = document.getElementById('klrNoPcrWrap');
+    if (noPcrWrap) noPcrWrap.classList.remove('active');
+    var pcrContent = document.getElementById('klrPcrContent');
+    if (pcrContent) pcrContent.style.display = '';
+    ['klrRequester','klrStrat','klrBrand','klrCampaign','klrDeadline'].forEach(function(id){
+      var el = document.getElementById(id); if(el) el.value='';
+    });
+    document.getElementById('klrPcrLink').value='';
+    document.getElementById('klrQEditorBody').innerHTML='';
+    klrPcrFiles=[]; renderKlrPcrFiles();
+    document.getElementById('klrPcrFileInput').value='';
+    klrFiles=[]; renderKlrFiles();
+    document.getElementById('klrFileInput').value='';
+    switchKlrPanel('notes');
+    // Reset update panel
+    switchKlrMode('form');
+    document.getElementById('klrUpdateRequester').value = '';
+    document.getElementById('klrUpdateStep2').style.display = 'none';
+    document.getElementById('klrUpdateStep3').style.display = 'none';
+    var klrUpdEditor = document.getElementById('klrUpdateEditorBody');
+    if (klrUpdEditor) { klrUpdEditor.innerHTML = ''; klrUpdEditor.classList.remove('has-content'); }
+    klrUpdateFiles = [];    renderKlrUpdateFiles();
+    klrUpdatePcrFiles = []; renderKlrUpdatePcrFiles();
+    document.getElementById('klrUpdateFileInput').value = '';
+    document.getElementById('klrUpdatePcrFileInput').value = '';
+    document.getElementById('klrUpdatePcrLink').value = '';
+    var pcrNotice = document.getElementById('klrUpdatePcrNotice');
+    if (pcrNotice) pcrNotice.style.display = 'none';
+    switchKlrUpdatePcr('notes'); // reset PCR toggle
+  }
+
+  // ══════════════════════════════════════════
+  // KLR MODE
+  // ══════════════════════════════════════════
+
+  var _mode = 'proposal';
+
+  function getFiveWorkingDays() {
+    var d = new Date();
+    var count = 0;
+    while (count < 5) {
+      d.setDate(d.getDate() + 1);
+      var day = d.getDay();
+      if (day !== 0 && day !== 6) count++;
+    }
+    var yyyy = d.getFullYear();
+    var mm   = String(d.getMonth() + 1).padStart('2', '0');
+    var dd   = String(d.getDate()).padStart('2', '0');
+    return yyyy + '-' + mm + '-' + dd;
+  }
+
+  function switchMode(mode) {
+    _mode = mode;
+    var isKlr = mode === 'klr';
+    document.getElementById('modeProposal').classList.toggle('active', !isKlr);
+    document.getElementById('modeKlr').classList.toggle('active', isKlr);
+    document.getElementById('proposalSection').style.display = isKlr ? 'none' : '';
+    // When switching away from KLR, always reset to the form sub-panel
+    if (!isKlr) switchKlrMode('form');
+    document.getElementById('klrSection').style.display = isKlr ? '' : 'none';
+    document.getElementById('submitBtn').textContent = isKlr ? 'Submit KLR Request' : 'Submit Brief';
+    document.getElementById('headerTitle').textContent = isKlr ? 'Key Learnings & Rec Portal' : 'Client Champion Brief Portal';
+    document.getElementById('headerSub').textContent = isKlr ? 'Campaign → Strategy' : 'Strategy Department';
+    if (isKlr) {
+      var dlEl = document.getElementById('klrDeadline');
+      if (!dlEl.value) dlEl.value = getFiveWorkingDays();
+    }
+  }
+
+  function switchKlrPanel(mode) {
+    document.getElementById('klrBtnNotes').classList.toggle('active', mode === 'notes');
+    document.getElementById('klrBtnLink').classList.toggle('active', mode === 'link');
+    document.getElementById('klrPanelNotes').classList.toggle('active', mode === 'notes');
+    document.getElementById('klrPanelLink').classList.toggle('active', mode === 'link');
+  }
+
+  // ── "No PCR yet" toggle ──
+  var klrNoPcr = false;
+
+  function toggleKlrNoPcr(checked) {
+    klrNoPcr = checked;
+    document.getElementById('klrPcrContent').style.display = checked ? 'none' : '';
+    document.getElementById('klrNoPcrWrap').classList.toggle('active', checked);
+  }
+
+  // ── Extract images from the rich-text editor ──
+  // Works on a CLONE of the editor HTML — the live editor is never touched,
+  // so the user never sees ##IMG_N## markers or missing images while editing.
+  function extractKlrImagesAsync(editorEl) {
+    return new Promise(function(resolve) {
+      var clone = document.createElement('div');
+      clone.innerHTML = editorEl.innerHTML; // clone, not the real DOM
+
+      var images  = [];
+      var counter = 0;
+      var imgs    = clone.querySelectorAll('img');
+
+      console.log('[KLR] extractKlrImages: found ' + imgs.length + ' <img> element(s)');
+
+      imgs.forEach(function(img) {
+        var src  = img.getAttribute('src') || '';
+        var repl = document.createElement('span');
+
+        if (src.indexOf('data:') === 0) {
+          counter++;
+          var myIdx    = counter;
+          var commaIdx = src.indexOf(',');
+          var b64      = src.substring(commaIdx + 1);
+          var mime     = (src.substring(0, commaIdx).match(/data:([^;]+);/) || [])[1] || 'image/png';
+          images.push({ data: b64, mimeType: mime, index: myIdx });
+          repl.textContent = '##IMG_' + myIdx + '##'; // marker for backend inline insertion
+          console.log('[KLR] img ' + myIdx + ': data: URL extracted');
+        } else {
+          repl.textContent = ''; // external URL — silently drop
+          console.log('[KLR] img: external URL dropped');
+        }
+
+        img.parentNode.replaceChild(repl, img);
+      });
+
+      console.log('[KLR] ' + images.length + ' image(s) extracted');
+      resolve({ images: images, cleanHtml: clone.innerHTML });
+    });
+  }
+
+  // ── KLR PCR FILE HANDLING (Attach PPTX Format panel) ──
+  var klrPcrFiles = [];
+
+  function handleKlrPcrFileSelect(files) {
+    for(var i=0;i<files.length;i++) klrPcrFiles.push(files[i]);
+    renderKlrPcrFiles();
+    document.getElementById('klrPcrFileInput').value='';
+  }
+  function removeKlrPcrFile(i) { klrPcrFiles.splice(i,1); renderKlrPcrFiles(); }
+  function renderKlrPcrFiles() {
+    var list=document.getElementById('klrPcrFileList'); list.innerHTML='';
+    klrPcrFiles.forEach(function(f,i){
+      var big=f.size>MAX, chip=document.createElement('div');
+      chip.className='file-chip';
+      chip.innerHTML='<div class="file-chip-icon">'+getIcon(f.name)+'</div>'
+        +'<div class="file-chip-info">'
+        +'<div class="file-chip-name">'+f.name+'</div>'
+        +'<div class="file-chip-size'+(big?' file-size-warning':'')+'">'+fmtSize(f.size)+(big?' — too large (max 25MB)':'')+'</div>'
+        +'</div>'
+        +'<button class="file-chip-remove" onclick="removeKlrPcrFile('+i+')">×</button>';
+      list.appendChild(chip);
+    });
+  }
+  function onKlrPcrDrop(e) {
+    e.preventDefault();
+    document.getElementById('klrPcrUploadZone').classList.remove('dragover');
+    handleKlrPcrFileSelect(e.dataTransfer.files);
+  }
+
+  // ── KLR SUPPORTING FILE HANDLING ──
+  var klrFiles = [];
+
+  function handleKlrFileSelect(files) {
+    for(var i=0;i<files.length;i++) klrFiles.push(files[i]);
+    renderKlrFiles();
+    document.getElementById('klrFileInput').value='';
+  }
+  function removeKlrFile(i) { klrFiles.splice(i,1); renderKlrFiles(); }
+  function renderKlrFiles() {
+    var list=document.getElementById('klrFileList'); list.innerHTML='';
+    klrFiles.forEach(function(f,i){
+      var big=f.size>MAX, chip=document.createElement('div');
+      chip.className='file-chip';
+      chip.innerHTML='<div class="file-chip-icon">'+getIcon(f.name)+'</div>'
+        +'<div class="file-chip-info">'
+        +'<div class="file-chip-name">'+f.name+'</div>'
+        +'<div class="file-chip-size'+(big?' file-size-warning':'')+'">'+fmtSize(f.size)+(big?' — too large (max 25MB)':'')+'</div>'
+        +'</div>'
+        +'<button class="file-chip-remove" onclick="removeKlrFile('+i+')">×</button>';
+      list.appendChild(chip);
+    });
+  }
+  function onDragOver(e, zoneId) {
+    e.preventDefault();
+    document.getElementById(zoneId || 'uploadZone').classList.add('dragover');
+  }
+  function onDragLeave(e, zoneId) {
+    document.getElementById(zoneId || 'uploadZone').classList.remove('dragover');
+  }
+  function onKlrDrop(e) {
+    e.preventDefault();
+    document.getElementById('klrUploadZone').classList.remove('dragover');
+    handleKlrFileSelect(e.dataTransfer.files);
+  }
+
+  // ── KLR SUBMIT ──
+  function submitKlrForm() {
+    var req  = document.getElementById('klrRequester').value.trim();
+    var st   = document.getElementById('klrStrat').value.trim();
+    var brand= document.getElementById('klrBrand').value.trim();
+    var camp = document.getElementById('klrCampaign').value.trim();
+    var dl   = document.getElementById('klrDeadline').value;
+
+    if(!req)  { showToast('Please select your name.','error'); return; }
+    if(!st)   { showToast('Please assign a strategist.','error'); return; }
+    if(!brand){ showToast('Please enter the client / brand name.','error'); return; }
+    if(!camp) { showToast('Please enter the campaign name.','error'); return; }
+    if(!dl)   { showToast('Please set a deadline.','error'); return; }
+
+    var isFile  = document.getElementById('klrPanelNotes').classList.contains('active');
+    var pcrLink = document.getElementById('klrPcrLink').value.trim();
+
+    if (!klrNoPcr) {
+      if(isFile && klrPcrFiles.length === 0) {
+        showToast('Please attach the PCR file (PPTX or PDF).','error'); return;
+      }
+      if(!isFile && !pcrLink) {
+        showToast('Please paste the PCR Google Drive or Slides link.','error'); return;
+      }
+    }
+
+    var oversized = klrFiles.concat(klrNoPcr ? [] : klrPcrFiles).filter(function(f){ return f.size>MAX; });
+    if(oversized.length>0){ showToast('Please remove files over 25MB.','error'); return; }
+
+    // Extract images from the editor first (async — handles data: URLs and external URLs).
+    // extractKlrImagesAsync() modifies the DOM in-place, so we read innerHTML AFTER it resolves.
+    var klrQEditor = document.getElementById('klrQEditorBody');
+
+    document.getElementById('submitBtn').disabled=true;
+    document.getElementById('loadingMsg').style.display='block';
+    var totalFiles = klrFiles.length + (!klrNoPcr && isFile ? klrPcrFiles.length : 0);
+    if(totalFiles>0){ document.getElementById('progressWrap').style.display='block'; document.getElementById('progressBar').style.width='30%'; }
+
+    extractKlrImagesAsync(klrQEditor).then(function(qExtracted) {
+      console.log('[KLR] klrImages to send:', qExtracted.images.length, 'image(s)');
+
+      var p = dl.split('-');
+      var formData = {
+        requestType: 'klr',
+        salesName:   req,
+        stratName:   st,
+        brand:       brand,
+        campaignName:camp,
+        deadline:    p[2]+'/'+p[1]+'/'+p[0],
+        noPcr:       klrNoPcr,
+        pcrType:     klrNoPcr ? 'pending' : (isFile ? 'file' : 'link'),
+        pcrLink:     isFile ? '' : pcrLink,
+        questions:   qExtracted.cleanHtml.trim(),
+        klrImages:   qExtracted.images
+      };
+
+    return Promise.all([
+      Promise.all(!klrNoPcr && isFile ? klrPcrFiles.map(readFileAsBase64) : []),
+      Promise.all(klrFiles.map(readFileAsBase64))
+    ]).then(function(results){
+      formData.pcrAttachments = results[0];
+      formData.attachments    = results[1];
+      if(totalFiles>0) document.getElementById('progressBar').style.width='70%';
+      google.script.run
+        .withSuccessHandler(function(r){
+          document.getElementById('submitBtn').disabled=false;
+          document.getElementById('loadingMsg').style.display='none';
+          document.getElementById('progressWrap').style.display='none';
+          if(r&&r.success){
+            document.getElementById('successIcon').textContent='📊';
+            document.getElementById('successTitle').textContent='KLR Request submitted!';
+            document.getElementById('successMsg').innerHTML=
+              'Your request has been sent to <strong>'+st+'</strong>.<br>They\'ll follow up on the ETA shortly.';
+            document.getElementById('formView').style.display='none';
+            document.getElementById('successView').style.display='block';
+          } else { showToast('Error: '+(r?r.error:'Unknown error'),'error'); }
+        })
+        .withFailureHandler(function(){
+          document.getElementById('submitBtn').disabled=false;
+          document.getElementById('loadingMsg').style.display='none';
+          document.getElementById('progressWrap').style.display='none';
+          showToast('Submission failed. Please try again.','error');
+        })
+        .handleBriefSubmission(formData);
+    }).catch(function(){
+      document.getElementById('submitBtn').disabled=false;
+      document.getElementById('loadingMsg').style.display='none';
+      showToast('Could not read a file. Please try again.','error');
+    });
+    }).catch(function(err) {
+      document.getElementById('submitBtn').disabled=false;
+      document.getElementById('loadingMsg').style.display='none';
+      document.getElementById('progressWrap').style.display='none';
+      console.error('[KLR] extractKlrImagesAsync error:', err);
+      showToast('Submission failed. Please try again.','error');
+    }); // close extractKlrImagesAsync.then()
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // KLR UPDATE PANEL
+  // ══════════════════════════════════════════════════════════════
+
+  var _klrUpdateSelected = null; // { rowIndex, brand, campaignName, stratName, requesterName, hasPcr, ... }
+  var klrUpdateFiles    = [];
+  var klrUpdatePcrFiles = [];
+
+  function switchKlrMode(subMode) {
+    var isUpdate = subMode === 'update';
+    document.getElementById('klrFormPanel').style.display   = isUpdate ? 'none' : '';
+    document.getElementById('klrUpdatePanel').style.display = isUpdate ? '' : 'none';
+    document.getElementById('submitBtn').style.display = isUpdate ? 'none' : '';
+  }
+
+  // ── Update panel rich text editor toolbar ──
+  function fmtKlrUpd(e, cmd) {
+    e.preventDefault();
+    document.getElementById('klrUpdateEditorBody').focus();
+    document.execCommand(cmd, false, null);
+  }
+  function updateKlrUpdateToolbarState() {}
+  function onKlrUpdateEditorInput() {
+    var el = document.getElementById('klrUpdateEditorBody');
+    if (el) el.classList.toggle('has-content', !!(el.innerText || el.textContent || '').trim() || el.innerHTML.includes('<img'));
+  }
+
+  // ── PCR toggle for update panel ──
+  function switchKlrUpdatePcr(mode) {
+    document.getElementById('klrUpdBtnNotes').classList.toggle('active', mode === 'notes');
+    document.getElementById('klrUpdBtnLink').classList.toggle('active',  mode === 'link');
+    document.getElementById('klrUpdPanelNotes').classList.toggle('active', mode === 'notes');
+    document.getElementById('klrUpdPanelLink').classList.toggle('active',  mode === 'link');
+  }
+
+  // ── PCR file handling ──
+  function handleKlrUpdatePcrFileSelect(files) {
+    for (var i = 0; i < files.length; i++) klrUpdatePcrFiles.push(files[i]);
+    renderKlrUpdatePcrFiles();
+    document.getElementById('klrUpdatePcrFileInput').value = '';
+  }
+  function removeKlrUpdatePcrFile(i) { klrUpdatePcrFiles.splice(i, 1); renderKlrUpdatePcrFiles(); }
+  function renderKlrUpdatePcrFiles() {
+    var list = document.getElementById('klrUpdatePcrFileList');
+    if (!klrUpdatePcrFiles.length) { list.innerHTML = ''; return; }
+    list.innerHTML = klrUpdatePcrFiles.map(function(f, i) {
+      return '<div class="file-item"><span class="file-name">' + f.name + '</span>' +
+             '<button class="file-remove" onclick="removeKlrUpdatePcrFile(' + i + ')">✕</button></div>';
+    }).join('');
+  }
+  function onKlrUpdatePcrDrop(e) {
+    e.preventDefault();
+    document.getElementById('klrUpdatePcrUploadZone').classList.remove('dragover');
+    handleKlrUpdatePcrFileSelect(e.dataTransfer.files);
+  }
+
+  // ── Step 1: search ──
+  function fetchKlrSubmissions() {
+    var name = document.getElementById('klrUpdateRequester').value.trim();
+    if (!name) { showToast('Please select your name first.', 'error'); return; }
+    var btn = document.getElementById('klrFindBtn');
+    btn.disabled = true; btn.textContent = 'Searching…';
+    google.script.run
+      .withSuccessHandler(function(results) {
+        btn.disabled = false; btn.textContent = '🔍 Find My KLRs';
+        renderKlrSubmissionsList(results);
+      })
+      .withFailureHandler(function() {
+        btn.disabled = false; btn.textContent = '🔍 Find My KLRs';
+        showToast('Could not load submissions. Please try again.', 'error');
+      })
+      .getKlrSubmissions(name);
+  }
+
+  // ── Step 2: render list ──
+  function renderKlrSubmissionsList(submissions) {
+    var list  = document.getElementById('klrSubmissionsList');
+    var step2 = document.getElementById('klrUpdateStep2');
+    var step3 = document.getElementById('klrUpdateStep3');
+    step3.style.display = 'none';
+    _klrUpdateSelected = null;
+    if (!submissions || submissions.length === 0) {
+      list.innerHTML = '<div class="klr-empty-state">No KLR submissions found for this name.<br>Only submissions made through the portal will appear here.</div>';
+    } else {
+      var html = '';
+      submissions.forEach(function(s) {
+        var safeS = JSON.stringify(s).replace(/"/g, '&quot;');
+        html +=
+          '<div class="klr-sub-item" onclick="selectKlrToUpdate(' + safeS + ')" id="klrSubItem' + s.rowIndex + '">' +
+            '<div class="klr-sub-brand">' + (s.brand || '—') + '</div>' +
+            '<div class="klr-sub-info">' + (s.campaignName || '—') + ' &nbsp;·&nbsp; ' + (s.status || '—') + ' &nbsp;·&nbsp; ' + s.deadline + '</div>' +
+            '<div class="klr-sub-code">' + (s.trackingCode || '') + '</div>' +
+          '</div>';
+      });
+      list.innerHTML = html;
+    }
+    step2.style.display = '';
+  }
+
+  // ── Step 3: select a KLR and show editor + PCR + files form ──
+  function selectKlrToUpdate(submission) {
+    _klrUpdateSelected = submission;
+
+    document.querySelectorAll('.klr-sub-item').forEach(function(el) { el.classList.remove('selected'); });
+    var card = document.getElementById('klrSubItem' + submission.rowIndex);
+    if (card) card.classList.add('selected');
+
+    document.getElementById('klrUpdateSelectedTitle').textContent =
+      (submission.brand || '—') + ' — ' + (submission.campaignName || '—');
+    document.getElementById('klrUpdateSelectedMeta').textContent =
+      'Code: ' + (submission.trackingCode || 'N/A') +
+      '  ·  Status: ' + (submission.status || 'N/A') +
+      '  ·  Deadline: ' + (submission.deadline || 'N/A');
+
+    // Reset rich text editor
+    var editor = document.getElementById('klrUpdateEditorBody');
+    if (editor) { editor.innerHTML = ''; editor.classList.remove('has-content'); }
+
+    // Reset PCR section
+    klrUpdatePcrFiles = []; renderKlrUpdatePcrFiles();
+    document.getElementById('klrUpdatePcrFileInput').value = '';
+    document.getElementById('klrUpdatePcrLink').value = '';
+    switchKlrUpdatePcr('notes');
+
+    // Show PCR-already notice if PCR exists
+    var notice = document.getElementById('klrUpdatePcrNotice');
+    if (notice) notice.style.display = submission.hasPcr ? '' : 'none';
+
+    // Reset supporting files
+    klrUpdateFiles = []; renderKlrUpdateFiles();
+    document.getElementById('klrUpdateFileInput').value = '';
+
+    var step3 = document.getElementById('klrUpdateStep3');
+    step3.style.display = '';
+    setTimeout(function() { step3.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+  }
+
+  // ── Supporting file handling ──
+  function handleKlrUpdateFileSelect(files) {
+    for (var i = 0; i < files.length; i++) klrUpdateFiles.push(files[i]);
+    renderKlrUpdateFiles();
+    document.getElementById('klrUpdateFileInput').value = '';
+  }
+  function removeKlrUpdateFile(i) { klrUpdateFiles.splice(i, 1); renderKlrUpdateFiles(); }
+  function renderKlrUpdateFiles() {
+    var list = document.getElementById('klrUpdateFileList');
+    if (!klrUpdateFiles.length) { list.innerHTML = ''; return; }
+    list.innerHTML = klrUpdateFiles.map(function(f, i) {
+      return '<div class="file-item"><span class="file-name">' + f.name + '</span>' +
+             '<button class="file-remove" onclick="removeKlrUpdateFile(' + i + ')">✕</button></div>';
+    }).join('');
+  }
+  function onKlrUpdateDrop(e) {
+    e.preventDefault();
+    document.getElementById('klrUpdateUploadZone').classList.remove('dragover');
+    handleKlrUpdateFileSelect(e.dataTransfer.files);
+  }
+
+  // ── Submit update ──
+  function submitKlrUpdate() {
+    if (!_klrUpdateSelected) { showToast('Please select a KLR request first.', 'error'); return; }
+
+    var editor      = document.getElementById('klrUpdateEditorBody');
+    var editorEmpty = !(editor && ((editor.innerText || editor.textContent || '').trim() || editor.innerHTML.includes('<img')));
+    var pcrLinkVal  = (document.getElementById('klrUpdatePcrLink').value || '').trim();
+    var pcrIsNotes  = document.getElementById('klrUpdPanelNotes').classList.contains('active');
+    var hasPcr      = pcrIsNotes ? klrUpdatePcrFiles.length > 0 : !!pcrLinkVal;
+
+    if (editorEmpty && klrUpdateFiles.length === 0 && !hasPcr) {
+      showToast('Please add context, a PCR, or attach at least one file.', 'error'); return;
+    }
+
+    var allFiles    = klrUpdateFiles.concat(klrUpdatePcrFiles);
+    var oversized   = allFiles.filter(function(f) { return f.size > 25 * 1024 * 1024; });
+    if (oversized.length > 0) {
+      showToast('One or more files exceed 25MB. Please remove them.', 'error'); return;
+    }
+
+    var btn = document.getElementById('klrUpdateSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Sending…';
+
+    extractKlrImagesAsync(editor).then(function(extracted) {
+      return Promise.all([
+        Promise.resolve(extracted),
+        Promise.all(klrUpdatePcrFiles.map(readFileAsBase64)),
+        Promise.all(klrUpdateFiles.map(readFileAsBase64))
+      ]);
+    }).then(function(results) {
+      var extracted    = results[0];
+      var pcrAttachB64 = results[1];
+      var attachB64    = results[2];
+
+      var pcrType = 'none';
+      if (pcrIsNotes && klrUpdatePcrFiles.length > 0)  pcrType = 'file';
+      else if (!pcrIsNotes && pcrLinkVal)               pcrType = 'link';
+
+      var payload = {
+        rowIndex:       _klrUpdateSelected.rowIndex,
+        requesterName:  _klrUpdateSelected.requesterName,
+        stratName:      _klrUpdateSelected.stratName,
+        brand:          _klrUpdateSelected.brand,
+        campaignName:   _klrUpdateSelected.campaignName,
+        trackingCode:   _klrUpdateSelected.trackingCode,
+        contextHtml:    extracted.cleanHtml,
+        contextImages:  extracted.images,
+        pcrType:        pcrType,
+        pcrLink:        pcrType === 'link' ? pcrLinkVal : '',
+        pcrAttachments: pcrType === 'file' ? pcrAttachB64 : [],
+        attachments:    attachB64
+      };
+
+      google.script.run
+        .withSuccessHandler(function(r) {
+          btn.disabled = false; btn.textContent = 'Send Update to Strategist';
+          if (r && r.success) {
+            showToast('Update sent! The strategist has been notified.', 'success');
+            // Reset step 3
+            if (editor) { editor.innerHTML = ''; editor.classList.remove('has-content'); }
+            klrUpdateFiles = [];    renderKlrUpdateFiles();
+            klrUpdatePcrFiles = []; renderKlrUpdatePcrFiles();
+            document.getElementById('klrUpdatePcrLink').value = '';
+            document.getElementById('klrUpdateStep3').style.display = 'none';
+            _klrUpdateSelected = null;
+            document.querySelectorAll('.klr-sub-item').forEach(function(el) { el.classList.remove('selected'); });
+          } else {
+            showToast('Error: ' + (r ? r.error : 'Unknown'), 'error');
+          }
+        })
+        .withFailureHandler(function() {
+          btn.disabled = false; btn.textContent = 'Send Update to Strategist';
+          showToast('Update failed. Please try again.', 'error');
+        })
+        .updateKlrContext(payload);
+    }).catch(function(err) {
+      btn.disabled = false; btn.textContent = 'Send Update to Strategist';
+      console.error('[KLR Update] error:', err);
+      showToast('Could not read a file. Please try again.', 'error');
+    });
+  }
+</script>
+</body>
+</html>
