@@ -4333,3 +4333,300 @@ function getBriefFormatIntel(brand, campaign, industry, briefSummary, deckType) 
     return { success: false, error: e.message };
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOID BRIEF — Strategist Dashboard
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Sets a brief's Status (Col J) to 'Void' and fires a Chat notification.
+ * Called from the Strategist Dashboard when a strategist voids an accidental submission.
+ */
+function voidBrief(rowIndex) {
+  try {
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(CONFIG.sheetName) || ss.getSheets()[0];
+
+    var numCols = CONFIG.colIndices.cc;
+    var row     = sheet.getRange(rowIndex, 1, 1, numCols).getValues()[0];
+    var brand   = String(row[CONFIG.colIndices.brand   - 1] || '').trim();
+    var project = String(row[CONFIG.colIndices.project - 1] || '').trim();
+    var strat   = String(row[CONFIG.colIndices.strat   - 1] || '').trim();
+    var cc      = String(row[CONFIG.colIndices.cc      - 1] || '').trim();
+    var deck    = String(row[1] || '').trim();
+
+    sheet.getRange(rowIndex, CONFIG.colIndices.status).setValue('Void');
+
+    var msg =
+      '🚫 *Brief Voided*\n\n' +
+      '*Brand:* '   + brand   + '\n' +
+      '*Project:* ' + project + '\n' +
+      '*Strat:* '   + getMention(strat) + ' has voided this brief.\n' +
+      '*Sales:* '   + getMention(cc)    + ' — please resubmit if this was an error.';
+
+    if (deck === 'KLR') {
+      sendCampaignWebhook_(msg);
+    } else {
+      sendWebhook(msg);
+    }
+
+    return { success: true };
+  } catch(e) {
+    Logger.log('voidBrief error: ' + e.toString());
+    return { success: false, error: e.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EDIT BRIEF — Sales Portal
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Returns all briefs submitted by salesName (Col H), sorted newest to oldest.
+ * Excludes Void rows. Used by the Sales portal Edit Brief panel.
+ */
+function getSalesBriefs(salesName) {
+  try {
+    var ss      = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet   = ss.getSheetByName(CONFIG.sheetName) || ss.getSheets()[0];
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+
+    var numRows  = lastRow - 1;
+    var values   = sheet.getRange(2, 1, numRows, 22).getValues();   // A–V
+    var formulas = sheet.getRange(2, 1, numRows, 22).getFormulas(); // needed to extract HYPERLINK URLs
+    var tz       = Session.getScriptTimeZone();
+    var briefs   = [];
+
+    for (var i = 0; i < numRows; i++) {
+      var row = values[i];
+      var cc  = String(row[CONFIG.colIndices.cc - 1] || '').trim(); // Col H
+      if (cc.toLowerCase() !== (salesName || '').toLowerCase()) continue;
+
+      var status = String(row[CONFIG.colIndices.status - 1] || '').trim();
+      if (status.toLowerCase() === 'void') continue;
+
+      var dl          = row[CONFIG.colIndices.deadline - 1]; // Col L
+      var deadlineStr = dl instanceof Date
+        ? Utilities.formatDate(dl, tz, 'dd/MM/yyyy') : '';
+
+      var submittedDate = row[20]; // Col U = Generated On
+      var submittedMs   = submittedDate instanceof Date ? submittedDate.getTime() : 0;
+      var submittedStr  = submittedDate instanceof Date
+        ? Utilities.formatDate(submittedDate, tz, 'dd MMM yyyy') : '';
+
+      var budgetRaw = String(row[5] || '').replace(/[^0-9.]/g, '');
+      var budgetNum = parseFloat(budgetRaw);
+
+      // Extract existing brief link from Col N (14) = "OG Brief Link 1"
+      var colNFormula = formulas[i][13] || '';
+      var colNValue   = String(values[i][13] || '');
+      var briefLink   = extractHyperlinkUrl_(colNFormula)
+                     || (colNValue.indexOf('http') === 0 ? colNValue : '');
+
+      briefs.push({
+        row:          i + 2,
+        trackingCode: String(row[0] || '').trim(),
+        deckType:     String(row[1] || '').trim(),
+        brand:        String(row[CONFIG.colIndices.brand   - 1] || '').trim(),
+        campaign:     String(row[CONFIG.colIndices.project - 1] || '').trim(),
+        strat:        String(row[CONFIG.colIndices.strat   - 1] || '').trim(),
+        status:       status,
+        deadline:     deadlineStr,
+        budget:       (!isNaN(budgetNum) && budgetNum > 0) ? budgetNum : '',
+        submittedDate: submittedStr,
+        submittedMs:  submittedMs,
+        briefLink:    briefLink
+      });
+    }
+
+    // Newest first
+    briefs.sort(function(a, b) { return b.submittedMs - a.submittedMs; });
+    return briefs;
+
+  } catch(e) {
+    Logger.log('getSalesBriefs error: ' + e.toString());
+    return [];
+  }
+}
+
+/**
+ * Overwrites editable fields for an existing brief row.
+ * Called from the Sales portal Edit Brief panel.
+ *
+ * fields: { campaign, strat, budget, deckType, deadline, briefLink }
+ */
+function updateBriefDetails(rowIndex, fields) {
+  try {
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(CONFIG.sheetName) || ss.getSheets()[0];
+
+    var row     = sheet.getRange(rowIndex, 1, 1, CONFIG.colIndices.cc).getValues()[0];
+    var brand   = String(row[CONFIG.colIndices.brand   - 1] || '').trim();
+    var strat   = String(row[CONFIG.colIndices.strat   - 1] || '').trim();
+    var cc      = String(row[CONFIG.colIndices.cc      - 1] || '').trim();
+    var deck    = String(row[1] || '').trim();
+
+    if (fields.campaign && fields.campaign.trim()) {
+      sheet.getRange(rowIndex, CONFIG.colIndices.project).setValue(fields.campaign.trim());
+    }
+    if (fields.strat && fields.strat.trim()) {
+      sheet.getRange(rowIndex, CONFIG.colIndices.strat).setValue(fields.strat.trim());
+      strat = fields.strat.trim();
+    }
+    if (fields.deckType && fields.deckType.trim() && deck !== 'KLR') {
+      // Don't overwrite KLR deck type — it's always 'KLR'
+      sheet.getRange(rowIndex, 2).setValue(fields.deckType.trim());
+    }
+    if (fields.budget !== undefined && fields.budget !== '') {
+      var budgetNum = parseFloat(String(fields.budget).replace(/[^0-9.]/g, ''));
+      if (!isNaN(budgetNum) && budgetNum >= 0) {
+        sheet.getRange(rowIndex, 6).setValue(budgetNum);
+        sheet.getRange(rowIndex, 6).setNumberFormat('"RM" #,##0.00');
+      }
+    }
+    if (fields.deadline && fields.deadline.trim()) {
+      var parts = fields.deadline.trim().split('/');
+      if (parts.length === 3) {
+        var newDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        sheet.getRange(rowIndex, CONFIG.colIndices.deadline).setValue(newDate);
+        sheet.getRange(rowIndex, CONFIG.colIndices.deadline).setNumberFormat('dd/mm/yyyy');
+      }
+    }
+    // OG Brief Link 1 → Col N (14)
+    if (fields.briefLink && fields.briefLink.trim().match(/^https?:\/\//)) {
+      sheet.getRange(rowIndex, 14).setValue(fields.briefLink.trim());
+    }
+    // Additional link → Col O (15)
+    if (fields.briefLinkAdditional && fields.briefLinkAdditional.trim().match(/^https?:\/\//)) {
+      sheet.getRange(rowIndex, 15).setFormula(
+        '=HYPERLINK("' + fields.briefLinkAdditional.trim() + '", "📎 Additional Link")'
+      );
+    }
+    // File attachments — upload to Drive and write formula to Col M (13)
+    var uploadedLinks = [];
+    if (fields.attachments && fields.attachments.length > 0) {
+      var attachFolder;
+      try {
+        var folders = DriveApp.getFoldersByName('Brief Edit Attachments');
+        attachFolder = folders.hasNext() ? folders.next() : DriveApp.createFolder('Brief Edit Attachments');
+      } catch(fe) { attachFolder = DriveApp.getRootFolder(); }
+      var colStart = 13; // Col M — intentionally kept empty in main sheet layout
+      for (var ai = 0; ai < fields.attachments.length && colStart <= 13; ai++) {
+        var att = fields.attachments[ai];
+        try {
+          var decoded  = Utilities.base64Decode(att.data);
+          var blob     = Utilities.newBlob(decoded, att.mimeType || 'application/octet-stream', att.name);
+          var uploaded = attachFolder.createFile(blob);
+          uploaded.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          uploadedLinks.push({ name: att.name, url: uploaded.getUrl() });
+          sheet.getRange(rowIndex, colStart).setFormula(
+            '=HYPERLINK("' + uploaded.getUrl() + '", "📎 ' + att.name.replace(/"/g, '') + '")'
+          );
+          colStart++;
+        } catch(afe) { Logger.log('updateBriefDetails: file upload failed — ' + afe.toString()); }
+      }
+    }
+
+    // Notify strat of changes
+    var campaign_ = (fields.campaign || String(row[CONFIG.colIndices.project - 1] || '')).trim();
+    var msg =
+      '✏️ *Brief Details Updated*\n\n' +
+      '*Brand:* '   + brand     + '\n' +
+      '*Project:* ' + campaign_ + '\n' +
+      '*Updated by:* ' + getMention(cc) + '\n' +
+      '*Strat:* '   + getMention(strat) + ' — please check your dashboard for changes.';
+    if (uploadedLinks.length > 0) {
+      msg += '\n*Attachments:* ' + uploadedLinks.map(function(l) { return l.name; }).join(', ');
+    }
+
+    if (deck === 'KLR') {
+      sendCampaignWebhook_(msg);
+    } else {
+      sendWebhook(msg);
+    }
+
+    return { success: true };
+  } catch(e) {
+    Logger.log('updateBriefDetails error: ' + e.toString());
+    return { success: false, error: e.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  FEEDBACK SYSTEM
+//  Sheet: "Feedback"  cols: A=Timestamp B=Text C=Upvotes D=Dismissed
+// ═══════════════════════════════════════════════════
+
+function getOrCreateFeedbackSheet_() {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Feedback');
+  if (!sheet) {
+    sheet = ss.insertSheet('Feedback');
+    sheet.appendRow(['Timestamp', 'Text', 'Upvotes', 'Dismissed']);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+/** Returns current user's email — used by the feedback overlay to show/hide dismiss button. */
+function getCurrentUserEmail() {
+  return Session.getActiveUser().getEmail() || '';
+}
+
+/** Appends a new feedback row (anonymous — no user info stored). */
+function submitFeedback(text) {
+  if (!text || !String(text).trim()) return { success: false };
+  var sheet = getOrCreateFeedbackSheet_();
+  sheet.appendRow([new Date(), String(text).trim(), 0, false]);
+  return { success: true };
+}
+
+/** Returns all non-dismissed feedback sorted by upvotes descending. */
+function getFeedback() {
+  try {
+    var sheet   = getOrCreateFeedbackSheet_();
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+    var data   = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    var tz     = Session.getScriptTimeZone();
+    var result = [];
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][3]) continue; // skip dismissed
+      result.push({
+        row:     i + 2,
+        text:    String(data[i][1] || ''),
+        upvotes: Number(data[i][2]) || 0,
+        ts:      data[i][0] instanceof Date
+                   ? Utilities.formatDate(data[i][0], tz, 'dd MMM yyyy')
+                   : ''
+      });
+    }
+    result.sort(function(a, b) { return b.upvotes - a.upvotes; });
+    return result;
+  } catch(e) {
+    Logger.log('getFeedback error: ' + e.toString());
+    return [];
+  }
+}
+
+/** Increments the upvote count for a feedback row. */
+function upvoteFeedback(rowIndex) {
+  try {
+    var sheet = getOrCreateFeedbackSheet_();
+    var cell  = sheet.getRange(rowIndex, 3);
+    cell.setValue((Number(cell.getValue()) || 0) + 1);
+    return { success: true };
+  } catch(e) { return { success: false }; }
+}
+
+/** Marks a feedback row as dismissed. Only khaikit.ko@revmedia.my may do this. */
+function dismissFeedback(rowIndex) {
+  var email = Session.getActiveUser().getEmail();
+  if (email !== 'khaikit.ko@revmedia.my') return { success: false, error: 'Unauthorized' };
+  try {
+    var sheet = getOrCreateFeedbackSheet_();
+    sheet.getRange(rowIndex, 4).setValue(true);
+    return { success: true };
+  } catch(e) { return { success: false }; }
+}
