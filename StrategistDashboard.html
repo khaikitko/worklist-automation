@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Briefs</title>
+  <style>
+    /* ── Premium Modern Overhaul ── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    :root {
+      /* High-End Color Palette */
+      --bg-body: #fbfbfd;
+      --bg-card: #ffffff;
+      --bg-header: rgba(255, 255, 255, 0.75);
+      
+      --text-main: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #a1a1a6;
+      
+      --border-light: #e5e5ea;
+      --border-focus: #0066cc;
+      
+      --accent-primary: #0066cc;
+      --accent-hover: #0071e3;
+      --accent-success: #34c759;
+      --accent-warning: #ff9500;
+      --accent-danger: #ff3b30;
+      
+      /* Status Colors */
+      --status-overdue-bg: #fff0f0;
+      --status-overdue-text: #d70015;
+      --status-soon-bg: #fff5e6;
+      --status-soon-text: #b95d00;
+      --status-ok-bg: #f2f2f7;
+      --status-ok-text: #1d1d1f;
+      --status-done-bg: #e3f5eb;
+      --status-done-text: #14723c;
+      
+      /* Shadows & Radii */
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+      --shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.1);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --radius-pill: 9999px;
+      
+      /* Transitions */
+      --transition-fast: 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+      --transition-smooth: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-body);
+      color: var(--text-main);
+      min-height: 100vh;
+      -webkit-text-size-adjust: 100%;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeOutUp {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-8px); }
+    }
+    
+    @keyframes pulseSoft {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(0.95); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* ── Header (Glassmorphism) ── */
+    .header {
+      position: sticky; top: 0; z-index: 50;
+      background: var(--bg-header);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: var(--transition-smooth);
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-icon { font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+    .header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+    .header-sub   { font-size: 13px; color: var(--text-secondary); font-weight: 500; margin-top: 2px; }
+    .pending-badge {
+      background: var(--text-main); color: #fff;
+      font-size: 12px; font-weight: 700;
+      border-radius: var(--radius-pill); padding: 4px 12px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ── Layout ── */
+    .container { padding: 20px 16px 64px; max-width: 600px; margin: 0 auto; }
+    .section-label {
+      font-size: 12px; font-weight: 600; color: var(--text-tertiary);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 24px 8px 12px;
+      transition: var(--transition-fast);
+    }
+
+    /* ── Premium Card ── */
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-md);
+      border: 1px solid rgba(0,0,0,0.03);
+      transition: var(--transition-smooth);
+      animation: fadeInUp 0.4s ease-out forwards;
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    
+    /* Staggered load animation */
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.1s; }
+    .card:nth-child(3) { animation-delay: 0.15s; }
+    .card:nth-child(4) { animation-delay: 0.2s; }
+    .card:nth-child(n+5) { animation-delay: 0.25s; }
+
+    .card:hover {
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-2px);
+    }
+
+    /* Status indicators via subtle borders/glows rather than thick lines */
+    .card.overdue { border-color: rgba(255, 59, 48, 0.3); }
+    .card.soon    { border-color: rgba(255, 149, 0, 0.3); }
+    .card.ok      { border-color: var(--border-light); }
+    .card.done    { 
+      opacity: 0.6; filter: grayscale(80%); 
+      box-shadow: var(--shadow-sm);
+    }
+    .card.done:hover { opacity: 0.95; filter: grayscale(0%); }
+
+    /* ── Deadline chip ── */
+    .dl-chip {
+      display: inline-flex; align-items: center;
+      font-size: 12px; font-weight: 600; letter-spacing: -0.01em;
+      border-radius: var(--radius-pill); padding: 6px 12px;
+      transition: var(--transition-fast);
+    }
+    .dl-overdue { background: var(--status-overdue-bg); color: var(--status-overdue-text); }
+    .dl-soon    { background: var(--status-soon-bg); color: var(--status-soon-text); }
+    .dl-ok      { background: var(--status-ok-bg); color: var(--status-ok-text); }
+    .dl-done    { background: var(--status-done-bg); color: var(--status-done-text); }
+
+    /* ── Card content ── */
+    .brand   { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; }
+    .project { font-size: 14px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; font-weight: 400; }
+    .meta    { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+    .meta strong { color: var(--text-main); font-weight: 600; }
+
+    /* ── Card header ── */
+    .card-header  { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .header-left  { display: flex; align-items: center; gap: 8px; }
+    .score-badge  {
+      margin-left: auto;
+      display: inline-flex; align-items: center;
+      font-size: 12px; font-weight: 700; color: var(--text-secondary);
+      background: var(--bg-body); border-radius: var(--radius-pill); padding: 6px 12px;
+      border: 1px solid var(--border-light);
+    }
+
+    /* ── Meta strip ── */
+    .meta-strip { 
+      display: flex; flex-wrap: wrap; align-items: center; 
+      margin-top: 8px; font-size: 13px; color: var(--text-secondary); 
+      font-weight: 500;
+    }
+    .meta-dot   { color: #d2d2d7; padding: 0 8px; }
+
+    /* ── Brief summary ── */
+    .brief-summary { 
+      margin-top: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+      padding: 12px 14px; background: rgba(0,0,0,0.02); border-radius: var(--radius-md);
+      word-break: break-word; overflow-wrap: break-word; 
+      border: 1px solid rgba(0,0,0,0.04);
+    }
+
+    /* ── Inline Editing & Links ── */
+    .dl-edit-icon {
+      background: none; border: none; cursor: pointer;
+      font-size: 12px; color: var(--text-tertiary); font-weight: 500;
+      text-decoration: underline; text-underline-offset: 3px;
+      transition: var(--transition-fast);
+    }
+    .dl-edit-icon:hover { color: var(--text-main); }
+
+    .brief-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+    .brief-link  { 
+      font-size: 13px; font-weight: 600; color: var(--accent-primary); 
+      text-decoration: none; transition: var(--transition-fast);
+    }
+    .brief-link:hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 2px; }
+
+    /* ── Card divider ── */
+    .card-divider { border-top: 1px solid var(--border-light); margin: 16px 0; }
+
+    /* ── Premium Buttons ── */
+    .action-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .btn-action {
+      padding: 12px;
+      font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+      border-radius: var(--radius-md); border: 1px solid var(--border-light);
+      background: var(--bg-body); color: var(--text-main);
+      cursor: pointer; transition: var(--transition-fast);
+      text-decoration: none; text-align: center; display: block;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .btn-action:hover {
+      background: #f0f0f5; border-color: #d2d2d7; transform: translateY(-1px);
+    }
+    .btn-action:active { transform: scale(0.98); }
+    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    
+    .btn-action.task { 
+      background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); 
+      box-shadow: 0 2px 8px rgba(0, 102, 204, 0.2);
+    }
+    .btn-action.task:hover { background: var(--accent-hover); box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3); }
+
+    .brief-select {
+      width: 100%; padding: 12px;
+      font-size: 14px; font-weight: 600; color: var(--text-main);
+      background: var(--bg-body); border: 1px solid var(--border-light);
+      border-radius: var(--radius-md); cursor: pointer;
+      -webkit-appearance: none; appearance: none;
+      text-align: center; text-align-last: center;
+      transition: var(--transition-fast);
+    }
+    .brief-select:focus { border-color: var(--accent-primary); outline: none; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15); }
+
+    /* ── Forms & Inputs ── */
+    .reassign-row { text-align: center; margin-top: 16px; }
+    .reassign-link {
+      font-size: 12px; font-weight: 500; color: var(--text-tertiary); cursor: pointer;
+      text-decoration: underline; text-underline-offset: 3px; transition: var(--transition-fast);
+    }
+    .reassign-link:hover { color: var(--text-secondary); }
+    
+    .handoff-form, .dl-form, .inline-form { display: none; margin-top: 12px; animation: fadeInUp 0.2s ease-out; }
+    .handoff-form.open, .dl-form.open, .inline-form.open { display: block; }
+    .handoff-form.closing, .dl-form.closing, .inline-form.closing { animation: fadeOutUp 0.25s ease-in forwards; }
+    
+    input[type="date"], input[type="url"], select {
+      width: 100%; padding: 14px; font-size: 16px; /* 16px prevents iOS zoom */
+      border: 1px solid var(--border-light); border-radius: var(--radius-md);
+      background: #fafafa; color: var(--text-main); font-family: inherit;
+      outline: none; transition: var(--transition-fast); box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+    }
+    input[type="date"]:focus, input[type="url"]:focus, select:focus {
+      background: #fff; border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+    }
+
+    .form-row { display: flex; gap: 10px; margin-top: 10px; }
+    
+    .btn-cancel {
+      padding: 14px 16px; font-size: 14px; font-weight: 600;
+      border: 1px solid var(--border-light); border-radius: var(--radius-md);
+      background: #fff; color: var(--text-secondary);
+      cursor: pointer; transition: var(--transition-fast);
+    }
+    .btn-cancel:hover { background: #f5f5f7; color: var(--text-main); }
+    
+    .btn-done {
+      flex: 1; padding: 14px; font-size: 14px; font-weight: 600;
+      border: none; border-radius: var(--radius-md);
+      background: var(--accent-success); color: #fff;
+      cursor: pointer; transition: var(--transition-fast);
+      box-shadow: 0 2px 8px rgba(52, 199, 89, 0.2);
+    }
+    .btn-done:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(52, 199, 89, 0.3); }
+    .btn-done:active { transform: scale(0.98); }
+
+    /* ── Action area ── */
+    .action-area { margin-top: 16px; }
+    .existing-proposal { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; font-weight: 500; }
+    .existing-proposal a { color: var(--accent-primary); text-decoration: none; word-break: break-all; }
+    .existing-proposal a:hover { text-decoration: underline; }
+
+    .btn-primary {
+      width: 100%; padding: 16px;
+      font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+      border: none; border-radius: var(--radius-md);
+      background: var(--text-main); color: #fff;
+      cursor: pointer; transition: var(--transition-fast);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary.update { background: #475569; }
+
+    .done-check { 
+      font-size: 14px; color: var(--accent-success); font-weight: 600; 
+      margin-top: 12px; display: flex; align-items: center; gap: 6px;
+    }
+    
+    /* View Proposal Button on Done Cards */
+    .btn-done-view {
+      font-size: 12px; font-weight: 600; color: var(--accent-primary);
+      background: rgba(0, 102, 204, 0.1); border-radius: var(--radius-pill);
+      padding: 6px 12px; text-decoration: none; transition: var(--transition-fast);
+      display: inline-flex; align-items: center; flex-shrink: 0;
+    }
+    .btn-done-view:hover { background: rgba(0, 102, 204, 0.18); transform: translateY(-1px); }
+
+    /* ── States (Loading/Empty) ── */
+    .state-screen { text-align: center; padding: 80px 24px; animation: fadeInUp 0.5s ease-out; }
+    .state-icon  { font-size: 56px; margin-bottom: 16px; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.1)); animation: pulseSoft 2.5s infinite ease-in-out; }
+    .state-title { font-size: 20px; font-weight: 700; color: var(--text-main); margin-bottom: 8px; letter-spacing: -0.02em; }
+    .state-sub   { font-size: 15px; color: var(--text-secondary); line-height: 1.5; max-width: 280px; margin: 0 auto; }
+
+    /* ── Advanced Features (Related, Learnings, Intel) ── */
+    .related-section, .learnings-section, .fintel-section { margin-top: 12px; }
+    .related-section { border-top: 1px solid var(--border-light); padding-top: 16px; }
+    
+    @keyframes gradientShimmer {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    
+    .btn-related, .btn-learnings, .btn-fintel {
+      width: 100%; padding: 14px;
+      font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+      background: #fafafa; border: 1px dashed #d2d2d7;
+      border-radius: var(--radius-md); cursor: pointer;
+      transition: var(--transition-fast); text-align: center;
+    }
+    
+    /* Magical Gradient for Related */
+    .btn-related {
+      background-image: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
+      background-size: 300% 300%;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+      border-color: #e5e7eb;
+    }
+    .btn-related:hover { 
+      animation: gradientShimmer 3s ease infinite; border-color: #d8b4fe; background-color: #fdf4ff;
+      transform: translateY(-1px);
+    }
+    
+    .btn-learnings { color: #475569; }
+    .btn-learnings:hover { border-color: #94a3b8; background: #f8fafc; color: #1e293b; transform: translateY(-1px); }
+    
+    .btn-fintel { color: #be185d; }
+    .btn-fintel:hover { border-color: #f472b6; background: #fdf2f8; color: #9f1239; transform: translateY(-1px); }
+
+    .related-loading, .related-empty, .learnings-empty, .learnings-error, .fintel-loading, .fintel-error {
+      font-size: 13px; color: var(--text-secondary); text-align: center; padding: 12px 0;
+    }
+    
+    .ref-wow, .ref-wow-loading { font-size: 13px; color: #475569; line-height: 1.5; margin-top: 8px; padding-left: 12px; border-left: 2px solid #cbd5e1; font-style: italic; }
+    .ref-wow-loading { color: var(--text-tertiary); }
+
+    /* ── Intelligence Panels ── */
+    .fintel-group {
+      border: 1px solid var(--border-light); border-radius: var(--radius-md);
+      padding: 16px; margin-bottom: 12px; background: #fafafa;
+      animation: fadeInUp 0.3s ease;
+    }
+    .fintel-group-label { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .fintel-type-tag { font-size: 10px; font-weight: 700; color: #be185d; background: #fce7f3; border-radius: 6px; padding: 4px 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .fintel-rationale { font-size: 13px; color: var(--text-secondary); margin-top: 8px; line-height: 1.5; }
+    
+    .fintel-stats {
+      margin-top: 12px; padding: 12px 16px;
+      background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-light);
+      display: flex; align-items: center; gap: 20px; box-shadow: var(--shadow-sm);
+    }
+    .fintel-stat-block { display: flex; flex-direction: column; gap: 4px; }
+    .fintel-stat-val { font-size: 22px; font-weight: 800; color: #0f766e; letter-spacing: -0.02em; }
+    .fintel-stat-val.dim { color: var(--text-secondary); }
+    .fintel-stat-lbl { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; }
+    .fintel-stat-div { width: 1px; height: 40px; background: var(--border-light); }
+
+    .fintel-performers { margin-top: 16px; }
+    .fintel-perf-label { font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .fintel-perf-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-light);
+      margin-bottom: 6px; font-size: 13px; transition: var(--transition-fast);
+    }
+    .fintel-perf-row:hover { box-shadow: var(--shadow-sm); transform: translateX(2px); }
+    .fintel-perf-name { flex: 1; font-weight: 500; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fintel-perf-type { font-size: 10px; font-weight: 600; color: #be185d; background: #fce7f3; border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
+    .fintel-perf-er { font-weight: 800; color: #0f766e; }
+    
+    .fintel-perf-link { font-size: 12px; font-weight: 600; color: var(--accent-primary); text-decoration: none; }
+    .fintel-perf-link:hover { text-decoration: underline; }
+
+    /* ── Learnings (Case Studies) ── */
+    .learnings-col-header {
+      font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 6px 12px; border-radius: var(--radius-sm); margin-bottom: 8px; display: inline-block;
+    }
+    .cs-header { background: #dcfce7; color: #166534; }
+    .kl-header { background: #fef9c3; color: #854d0e; }
+
+    .lrn-card {
+      background: #fff; border: 1px solid var(--border-light); border-radius: var(--radius-md);
+      padding: 14px; margin-bottom: 10px; cursor: pointer; transition: var(--transition-fast);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .lrn-card:hover { border-color: #d2d2d7; box-shadow: var(--shadow-sm); }
+    .lrn-card-active { background: #fafafa; border-color: #d2d2d7; }
+    .lrn-card-cs.lrn-card-active { border-left: 4px solid #22c55e; }
+    .lrn-card-kl.lrn-card-active { border-left: 4px solid #f59e0b; }
+
+    .lrn-card-top { display: flex; align-items: flex-start; gap: 12px; }
+    .lrn-card-left { display: flex; align-items: flex-start; gap: 10px; flex: 1; }
+    .lrn-card-meta { display: flex; flex-direction: column; gap: 2px; }
+    .lrn-card-title { font-size: 14px; font-weight: 700; color: var(--text-main); }
+    .lrn-card-sub { font-size: 12px; color: var(--text-secondary); }
+    .lrn-chevron { font-size: 18px; color: var(--text-tertiary); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .lrn-card-active .lrn-chevron { transform: rotate(90deg); color: var(--text-main); }
+
+    .lrn-card-expand { 
+      display: none; margin-top: 12px; padding-top: 12px; 
+      border-top: 1px solid var(--border-light); animation: fadeInUp 0.2s ease; 
+    }
+    .lrn-card-expand.lrn-card-open { display: block; }
+    .lrn-full-summary { font-size: 13px; color: #334155; line-height: 1.6; font-style: italic; margin-bottom: 12px; }
+    .lrn-open-link { font-size: 13px; font-weight: 600; color: var(--accent-primary); text-decoration: none; }
+    .lrn-open-link:hover { text-decoration: underline; }
+
+    /* Related Ref Items */
+    .ref-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
+    .ref-item:last-child { border-bottom: none; }
+    .ref-year { font-size: 10px; font-weight: 700; color: #fff; border-radius: 6px; padding: 4px 8px; margin-top: 2px; }
+    .ref-year.y2023 { background: #3b82f6; } .ref-year.y2024 { background: #8b5cf6; } 
+    .ref-year.y202526 { background: #10b981; } .ref-year.y2025 { background: #0ea5e9; } .ref-year.y2026 { background: #ec4899; }
+    .ref-brand { font-size: 14px; font-weight: 700; color: var(--text-main); }
+    .ref-camp { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .ref-reason { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; font-style: italic; }
+    
+    /* Force 'Open ->' to stay on a single line */
+    .ref-open { 
+      font-size: 12px; font-weight: 600; color: var(--accent-primary); text-decoration: none; padding-top: 2px; 
+      white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center;
+    }
+    .ref-open:hover { text-decoration: underline; }
+
+    /* Panel Collapse Bar */
+    .panel-collapse-bar {
+      text-align: center; padding: 12px 0 4px;
+      font-size: 12px; font-weight: 600; color: var(--text-tertiary);
+      cursor: pointer; letter-spacing: 0.05em; transition: var(--transition-fast);
+      text-transform: uppercase;
+    }
+    .panel-collapse-bar:hover { color: var(--text-secondary); }
+
+    /* ── Horizontal Product Strip / Marquee ── */
+    .product-strip-wrap, .marquee-section { margin-top: 16px; border-top: 1px solid var(--border-light); padding-top: 16px; }
+    .product-strip-label, .marquee-label {
+      font-size: 11px; font-weight: 700; color: var(--text-tertiary);
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;
+    }
+    
+    .product-strip, .marquee-track {
+      display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; padding-top: 4px;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .product-strip::-webkit-scrollbar, .marquee-track-wrap::-webkit-scrollbar { display: none; }
+    
+    .product-card, .marquee-card {
+      flex: 0 0 auto; width: 85vw; max-width: 400px; 
+      background: #fff; border-radius: var(--radius-md); padding: 16px;
+      border: 1px solid var(--border-light); text-decoration: none;
+      display: flex; flex-direction: column; gap: 6px;
+      transition: var(--transition-fast); box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .product-card:hover, .marquee-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); border-color: #d2d2d7; }
+    
+    .product-year-badge {
+      font-size: 10px; font-weight: 800; border-radius: 6px; padding: 3px 8px; width: fit-content; text-transform: uppercase;
+    }
+    .pyear-2026 { background: #dcfce7; color: #166534; }
+    .pyear-2025 { background: #f3e8ff; color: #6b21a8; }
+    .pyear-2024 { background: #dbeafe; color: #1e40af; }
+    .pyear-other { background: #f1f5f9; color: #475569; }
+    
+    .product-concept, .marquee-concept { font-size: 14px; font-weight: 700; color: var(--text-main); line-height: 1.3; }
+    .product-name, .marquee-name { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+    .product-desc, .marquee-desc { font-size: 12px; color: var(--text-tertiary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .product-open, .marquee-open { margin-top: auto; padding-top: 8px; font-size: 12px; font-weight: 600; color: var(--accent-primary); }
+
+    /* Marquee specifics */
+    .marquee-track-wrap { overflow: hidden; position: relative; }
+    .marquee-track-wrap::before, .marquee-track-wrap::after {
+      content: ''; position: absolute; top: 0; bottom: 0; z-index: 2; width: 40px; pointer-events: none;
+    }
+    .marquee-track-wrap::before { left: 0; background: linear-gradient(to right, var(--bg-body), transparent); }
+    .marquee-track-wrap::after { right: 0; background: linear-gradient(to left, var(--bg-body), transparent); }
+    
+    @keyframes marquee-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+    /* CHANGED: marquee duration to 400s */
+    .marquee-track { width: max-content; animation: marquee-scroll 400s linear infinite; }
+    .marquee-track:hover { animation-play-state: paused; }
+
+    /* ── KLR Specifics ── */
+    .klr-badge {
+      font-size: 11px; font-weight: 700; background: #fef3c7; color: #92400e;
+      border-radius: var(--radius-pill); padding: 4px 10px;
+    }
+    .btn-action.klr-has-update { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+    .new-update-dot {
+      display: inline-block; width: 8px; height: 8px; background: #ef4444;
+      border-radius: 50%; margin-left: 6px; vertical-align: middle;
+      animation: klr-pulse 1.5s ease-in-out infinite; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
+    @keyframes klr-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    .btn-analyse { 
+      font-size: 12px; font-weight: 600; color: var(--text-tertiary); background: none; border: none; cursor: pointer;
+      margin-top: 6px; text-decoration: underline; text-underline-offset: 2px; transition: var(--transition-fast);
+    }
+    .btn-analyse:hover { color: var(--text-main); }
+  </style>
+</head>
+<body>
+
+  <script>
+    (function() {
+      var m = document.createElement('meta');
+      m.name = 'viewport';
+      m.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0';
+      document.head.appendChild(m);
+      if (window.screen.width > 600) {
+        document.documentElement.classList.add('desktop');
+      }
+    })();
+  </script>
+
+  <div class="header">
+    <div class="header-left">
+      <span class="header-icon">📋</span>
+      <div>
+        <div class="header-title" id="hTitle">My Briefs</div>
+        <div class="header-sub"  id="hSub">Loading...</div>
+      </div>
+    </div>
+    <div class="pending-badge" id="hBadge" style="display:none"></div>
+  </div>
+
+  <div class="container" id="container">
+    <div class="state-screen">
+      <div class="state-icon">⏳</div>
+      <div class="state-sub" id="loadingMsg">Asking Dom for data...</div>
+    </div>
+  </div>
+
+  <script>
+    // ── Loading messages ──────────────────────────────────────────────────
+    var _loadingMsgs = [
+      'Asking Dom for data...',
+      'Checking if PC is involved in your briefs...',
+      'Calculating if client is willing to spend...',
+      'Channelling award winning mindset...',
+      'Shouting #GoForGrowth internally...',
+      'Counting how many times Pritib says Aisehhh...',
+      'Pretending the deadline is fine...',
+      'Convincing client the idea was always theirs...',
+      'Waiting for client to "revert by EOD"...',
+      'Making sure Josh is okay with the budget...',
+      'Searching for the deck that was due yesterday...',
+      'Translating what client means by "social first"...',
+      'Finding out what "viral" means to the client...',
+      'Justifying why gallery posts still works...',
+      'Deciding if the brief needs a deck or a prayer...',
+      'Pretending we didn\'t see that 4:59pm WhatsApp...',
+      'Turning a 3-word brief into a 30-slide deck...',
+      'Googling what the client\'s competitor just did...',
+      'Estimating how many rounds of amends this will take...',
+      'Quietly judging the previous agency\'s work...',
+      'Reminding myself we won 7 Awards this year...',
+      'Checking if "awareness" is actually the objective...',
+      'Figuring out if this is urgent or "urgent"...',
+      'Wondering if the client read the last deck...',
+      'Calculating how many coffees this brief will cost...',
+    ];
+    // Shuffle so every session starts on a different message
+    _loadingMsgs.sort(function() { return Math.random() - 0.5; });
+    var _loadingIdx = 0;
+    var _loadingTimer = setInterval(function() {
+      var el = document.getElementById('loadingMsg');
+      if (!el) { clearInterval(_loadingTimer); return; }
+      _loadingIdx = (_loadingIdx + 1) % _loadingMsgs.length;
+      el.style.opacity = '0';
+      setTimeout(function() {
+        if (el) { el.textContent = _loadingMsgs[_loadingIdx]; el.style.opacity = '1'; }
+      }, 200);
+    }, 2000);
+  </script>
+  <style>
+    #loadingMsg { transition: opacity 0.2s ease; }
+  </style>
+
+  <script>
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    var allStrats = [];
+    var currentStrat = '';
+
+    function esc(s) {
+      if (s == null) return '';
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function dlInfo(b) {
+      if (!b.deadlineMs) return { label:'No deadline', chipCls:'dl-ok', cardCls:'ok' };
+      var now = new Date(); now.setHours(0,0,0,0);
+      var dl  = new Date(b.deadlineMs); dl.setHours(0,0,0,0);
+      var diff = Math.round((dl - now) / 86400000);
+      if (diff < 0) return { label:'⚠ Overdue',    chipCls:'dl-overdue', cardCls:'overdue' };
+      if (diff === 0) return { label:'⚡ Due today', chipCls:'dl-soon',    cardCls:'soon' };
+      if (diff <= 3)  return { label:'Due in '+ diff +' day'+ (diff===1?'':'s'), chipCls:'dl-soon', cardCls:'soon' };
+      return { label:'Due', chipCls:'dl-ok', cardCls:'ok' };
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────
+
+    var _pendingCount = 0; // track offset for done card indices
+
+    function render(data) {
+      if (!data || !data.found) {
+        var msg = data && data.error === 'not_found'
+          ? 'Your Google account (<strong>' + esc(data.email) + '</strong>) isn\'t in the strategist list.<br>Ask Keith to add you.'
+          : 'Could not identify your account. Make sure you\'re signed into your REV Media Google account.';
+        document.getElementById('hSub').textContent = 'Access denied';
+        document.getElementById('container').innerHTML =
+          '<div class="state-screen"><div class="state-icon">🔒</div>' +
+          '<div class="state-title">Not recognised</div>' +
+          '<div class="state-sub">' + msg + '</div></div>';
+        return;
+      }
+
+      allStrats    = data.strats || [];
+      currentStrat = data.name  || '';
+
+      var pending = data.briefs; // backend now returns pending-only on first call
+      _pendingCount = pending.length;
+
+      document.getElementById('hTitle').textContent = 'Hey, ' + data.name + ' 👋';
+      document.getElementById('hSub').textContent = pending.length === 0
+        ? 'All clear! 🎉' : pending.length + ' brief' + (pending.length === 1 ? '' : 's') + ' to action';
+
+      if (pending.length > 0) {
+        var badge = document.getElementById('hBadge');
+        badge.textContent = pending.length;
+        badge.style.display = '';
+      }
+
+      var html = '';
+
+      if (pending.length === 0) {
+        html += '<div class="state-screen"><div class="state-icon">🎉</div>' +
+          '<div class="state-title">All clear!</div>' +
+          '<div class="state-sub">No pending briefs right now.</div></div>';
+      } else {
+        pending.forEach(function(b, i) { html += card(b, i, false); });
+      }
+
+      // Render completed preview + load-more if needed
+      var donePreview = data.donePreview || [];
+      var doneTotal   = data.doneTotal   || 0;
+      var doneRemaining = doneTotal - donePreview.length;
+
+      // Product marquee placeholder — filled after getAllProducts() returns
+      html += '<div id="product-marquee-section"></div>';
+
+      html += '<div id="completed-section">';
+      if (doneTotal > 0) {
+        html += '<div class="section-label">Completed (' + doneTotal + ')</div>';
+        donePreview.forEach(function(b, i) { html += card(b, _pendingCount + i, true); });
+        if (doneRemaining > 0) {
+          html += '<div class="section-label" style="cursor:pointer;padding-top:8px" onclick="loadCompleted(this,' + donePreview.length + ')">' +
+            'Show ' + doneRemaining + ' more · <span style="color:#0066cc;font-weight:700">Load →</span></div>';
+        }
+      }
+      html += '</div>';
+
+      document.getElementById('container').innerHTML = html;
+
+      // Restore "✓ Added" state from localStorage so button doesn't reset on refresh
+      try {
+        var added = JSON.parse(localStorage.getItem('tasksAdded') || '[]');
+        added.forEach(function(rowStr) {
+          var btn = document.querySelector('[data-row="' + rowStr + '"].task');
+          if (btn) { btn.textContent = '✓ Added'; btn.disabled = true; btn.style.opacity = '0.6'; }
+        });
+      } catch(e) {}
+    }
+
+    function loadCompleted(label, alreadyShown) {
+      label.innerHTML = 'Loading… <span style="color:#a1a1a6"></span>';
+      label.style.cursor = 'default';
+      label.onclick = null;
+      google.script.run
+        .withSuccessHandler(function(data) {
+          if (!data || !data.briefs) return;
+          var done = data.briefs.slice(alreadyShown || 0);
+          var html = '';
+          done.forEach(function(b, i) { html += card(b, _pendingCount + (alreadyShown || 0) + i, true); });
+          label.outerHTML = html;
+          // Restore task button states
+          try {
+            var added = JSON.parse(localStorage.getItem('tasksAdded') || '[]');
+            added.forEach(function(rowStr) {
+              var btn = document.querySelector('[data-row="' + rowStr + '"].task');
+              if (btn) { btn.textContent = '✓ Added'; btn.disabled = true; btn.style.opacity = '0.6'; }
+            });
+          } catch(e) {}
+        })
+        .withFailureHandler(function() {
+          label.innerHTML = 'Failed to load · <span style="color:#ff3b30;cursor:pointer" onclick="loadCompleted(this.parentElement,' + (alreadyShown||0) + ')">Retry →</span>';
+        })
+        .getStrategistData(true);
+    }
+
+    function card(b, idx, isDone) {
+      var di = isDone
+        ? { label:'✓ Done', chipCls:'dl-done', cardCls:'done' }
+        : dlInfo(b);
+
+      var isKlr = b.deck === 'KLR';
+      var out = '<div class="card ' + di.cardCls + '" id="c-' + idx + '" data-deck="' + esc(b.deck || '') + '">';
+
+      // ── Header: [chip + date + edit btn] .............. [score] ──
+      var scoreNum = parseFloat(b.score);
+      var hasScore = !isNaN(scoreNum) && scoreNum > 0;
+
+      if (isDone) {
+        // Done cards: chip only (no edit button)
+        out += '<div class="card-header">';
+        out += '<div class="dl-chip ' + di.chipCls + '">' + di.label + '</div>';
+        if (isKlr) out += '<span class="klr-badge">KLR Request</span>';
+        else if (hasScore) out += '<div class="score-badge">Score: ' + scoreNum.toFixed(1) + '</div>';
+        out += '</div>';
+
+      } else if (b.deadline && b.deadline !== 'N/A') {
+        // Active with deadline: chip includes date + Edit button beside it
+        var dlParts    = b.deadline.split('/');
+        var dlInputVal = dlParts.length === 3 ? dlParts[2] + '-' + dlParts[1] + '-' + dlParts[0] : '';
+        var chipLabel  = di.label + ': <span id="dl-' + idx + '">' + esc(b.deadline) + '</span>';
+
+        out += '<div class="card-header">';
+        out += '<div class="header-left" id="dlr-' + idx + '">' +
+          '<div class="dl-chip ' + di.chipCls + '">' + chipLabel + '</div>' +
+          '<button class="dl-edit-icon" onclick="editDl(' + idx + ')">✏ Change</button>' +
+          '</div>';
+        if (isKlr) out += '<span class="klr-badge">KLR Request</span>';
+        else if (hasScore) out += '<div class="score-badge">Score: ' + scoreNum.toFixed(1) + '</div>';
+        out += '</div>';
+
+        // Date edit form (hidden, appears below header when open)
+        out += '<div class="dl-form" id="dlf-' + idx + '">' +
+          '<input type="date" id="dli-' + idx + '" value="' + dlInputVal + '">' +
+          '<div class="form-row" style="margin-top:6px">' +
+          '<button class="btn-cancel" onclick="cancelDl(' + idx + ')">Cancel</button>' +
+          '<button class="btn-done" id="dlsave-' + idx + '" onclick="saveDl(' + idx + ',' + b.row + ')">Save</button>' +
+          '</div></div>';
+
+      } else {
+        // Active, no deadline
+        out += '<div class="card-header">';
+        out += '<div class="dl-chip ' + di.chipCls + '">' + di.label + '</div>';
+        if (isKlr) out += '<span class="klr-badge">KLR Request</span>';
+        else if (hasScore) out += '<div class="score-badge">Score: ' + scoreNum.toFixed(1) + '</div>';
+        out += '</div>';
+      }
+
+      // ── Brand + Project ──
+      out += '<div class="brand">' + esc(b.brand) + '</div>';
+      if (b.project) out += '<div class="project">' + esc(b.project) + '</div>';
+
+      // ── Meta: CC · Budget (deadline now lives in the chip) ──
+      var metaParts = [];
+      if (b.cc)     metaParts.push(esc(b.cc));
+      if (b.budget) metaParts.push(esc(b.budget));
+      // Done cards: append deadline to meta since it's not in the chip
+      if (isDone && b.deadline && b.deadline !== 'N/A') metaParts.push('📅 ' + esc(b.deadline));
+      if (metaParts.length) {
+        out += '<div class="meta-strip">' + metaParts.join('<span class="meta-dot">·</span>') + '</div>';
+      }
+
+      // ── Brief Summary ──
+      if (b.briefSummary) {
+        var cleanSummary = b.briefSummary.replace(/https?:\/\/\S+/g, '').replace(/\s{2,}/g, ' ').trim();
+        var summaryWords = cleanSummary.split(/\s+/);
+        var summaryText  = summaryWords.slice(0, 50).join(' ') + (summaryWords.length > 50 ? '…' : '');
+        if (summaryText.trim()) {
+          out += '<div class="brief-summary">' + esc(summaryText) + '</div>';
+        }
+      }
+
+      // ── Done state ──
+      if (isDone) {
+        // Brief link as text for reference
+        if (b.briefLinks && b.briefLinks.length > 0) {
+          out += '<div class="brief-links" style="margin-top:10px">';
+          b.briefLinks.forEach(function(url, li) {
+            var label = b.briefLinks.length > 1 ? 'Brief ' + (li+1) + ' 🔗' : 'Open Brief 🔗';
+            out += '<a class="brief-link" href="' + esc(url) + '" target="_blank">' + label + '</a>';
+          });
+          out += '</div>';
+        }
+        
+        // CHANGED: Added clickable "View Proposal ->" button directly inside the done-check row
+        if (b.proposalLink) {
+          out += '<div class="done-check" style="justify-content: space-between;">' +
+                   '<span>' + (isKlr ? '✓ KLR deck submitted' : '✓ Proposal submitted') + '</span>' +
+                   '<a href="' + esc(b.proposalLink) + '" target="_blank" class="btn-done-view">View Proposal →</a>' +
+                 '</div>';
+        }
+
+      // ── Active state ──
+      } else {
+        out += '<div class="card-divider"></div>';
+
+        // ── Action buttons ──
+        var taskTitle = esc(b.brand + (b.project ? ' — ' + b.project : ''));
+        var taskNotes = esc('CC: ' + b.cc + (b.budget ? ' | ' + b.budget : '') + '\\nDeadline: ' + b.deadline);
+        var taskBtn = '<button class="btn-action task" id="task-' + idx + '"' +
+          ' data-title="' + taskTitle + '"' +
+          ' data-notes="' + taskNotes + '"' +
+          ' data-deadline="' + esc(b.deadline || '') + '"' +
+          ' data-row="' + b.row + '"' +
+          ' onclick="addTaskFromBtn(this)">Add to Tasks</button>';
+
+        if (isKlr) {
+          // ── KLR: 3 dedicated buttons ──
+          var klrBriefUrl = (b.briefLinks && b.briefLinks.length > 0) ? b.briefLinks[0] : '';
+          var pcrLinks    = (b.briefLinks && b.briefLinks.length > 1) ? b.briefLinks.slice(1) : [];
+
+          // Row 1: KLR Brief | View PCR & Files (2-col)
+          out += '<div class="action-links">';
+
+          if (klrBriefUrl) {
+            var klrBriefCls = b.hasUpdate ? 'btn-action klr-has-update' : 'btn-action';
+            var klrDot      = b.hasUpdate ? '<span class="new-update-dot"></span>' : '';
+            var klrClick    = b.hasUpdate ? ' onclick="clearKlrUpdateFlag(' + b.row + ', this)"' : '';
+            out += '<a class="' + klrBriefCls + '" href="' + esc(klrBriefUrl) + '" target="_blank"' + klrClick + '>KLR Brief 📄' + klrDot + '</a>';
+          } else {
+            out += '<span class="btn-action" style="opacity:.4;pointer-events:none;cursor:default">KLR Brief 📄</span>';
+          }
+
+          if (pcrLinks.length === 0) {
+            out += '<span class="btn-action" style="opacity:.4;pointer-events:none;cursor:default">No PCR yet</span>';
+          } else if (pcrLinks.length === 1) {
+            out += '<a class="btn-action" href="' + esc(pcrLinks[0]) + '" target="_blank">Open PCR 📊</a>';
+          } else {
+            // Multiple: dropdown + Open All side by side in the 2-col row
+            var pcrUrlsJson = JSON.stringify(pcrLinks).replace(/"/g, '&quot;');
+            out += '<select class="brief-select" onchange="openBrief(this)">';
+            out += '<option value="">View Files ▾</option>';
+            out += '<option value="' + esc(pcrLinks[0]) + '">PCR</option>';
+            for (var pci = 1; pci < pcrLinks.length; pci++) {
+              out += '<option value="' + esc(pcrLinks[pci]) + '">File ' + pci + '</option>';
+            }
+            out += '</select>';
+          }
+
+          out += '</div>'; // row 1
+
+          // If multiple PCR files, add Open All row
+          if (pcrLinks.length > 1) {
+            var pcrUrlsJson2 = JSON.stringify(pcrLinks).replace(/"/g, '&quot;');
+            out += '<div style="margin-bottom:10px">' +
+              '<button class="btn-action" style="width:100%;display:block;box-sizing:border-box" onclick="openAllLinks(' + pcrUrlsJson2 + ')">Open All PCR & Files 📊</button>' +
+              '</div>';
+          }
+
+          // Row 2: Add to Google Tasks — full width
+          out += '<div style="margin-bottom:10px">' +
+            taskBtn.replace('class="btn-action task"', 'class="btn-action task" style="width:100%;display:block;box-sizing:border-box"') +
+            '</div>';
+
+        } else {
+          // ── Non-KLR: 2-col when 1 link, 3-row when multiple ──
+          if (b.briefLinks && b.briefLinks.length > 0) {
+            if (b.briefLinks.length === 1) {
+              out += '<div class="action-links">';
+              out += '<a class="btn-action" href="' + esc(b.briefLinks[0]) + '" target="_blank">Open Brief 🔗</a>';
+              out += taskBtn;
+              out += '</div>';
+            } else {
+              // Dropdown + Open All on separate rows, then tasks
+              var allUrlsJson = JSON.stringify(b.briefLinks).replace(/"/g, '&quot;');
+              out += '<div class="action-links" style="margin-bottom:10px">';
+              out += '<select class="brief-select" onchange="openBrief(this)">';
+              out += '<option value="">Select Brief ▾</option>';
+              b.briefLinks.forEach(function(url, li) {
+                out += '<option value="' + esc(url) + '">Brief ' + (li + 1) + '</option>';
+              });
+              out += '</select>';
+              out += '<button class="btn-action" onclick="openAllLinks(' + allUrlsJson + ')">Open All 🔗</button>';
+              out += '</div>';
+              out += '<div style="margin-bottom:10px">' + taskBtn.replace('class="btn-action task"', 'class="btn-action task" style="width:100%;display:block;box-sizing:border-box"') + '</div>';
+            }
+          } else {
+            // No brief link — task button full width
+            out += '<div style="margin-bottom:10px">' + taskBtn.replace('class="btn-action task"', 'class="btn-action task" style="width:100%;display:block"') + '</div>';
+          }
+        }
+
+        // Submit Proposal / KLR Deck
+        var submitLabel = isKlr ? 'Submit KLR Deck' : 'Submit Proposal';
+        var updateLabel = isKlr ? 'Update KLR Deck' : 'Update Proposal';
+        var linkLabel   = isKlr ? 'Paste KLR deck link...' : 'Paste proposal link...';
+        var existLabel  = isKlr ? 'KLR Deck: ' : 'Proposal: ';
+        out += '<div class="action-area">';
+        if (b.proposalLink) {
+          out += '<div class="existing-proposal">' + existLabel +
+            '<a href="' + esc(b.proposalLink) + '" target="_blank">' + esc(b.proposalLink) + '</a></div>' +
+            '<button class="btn-primary update" onclick="openForm(' + idx + ')">' + updateLabel + '</button>';
+        } else {
+          out += '<button class="btn-primary" onclick="openForm(' + idx + ')">' + submitLabel + '</button>';
+        }
+        out += '<div class="inline-form" id="f-' + idx + '">' +
+          '<input type="url" id="u-' + idx + '" placeholder="' + linkLabel + '" ' +
+            (b.proposalLink ? 'value="' + esc(b.proposalLink) + '"' : '') + ' />' +
+          '<div class="form-row">' +
+          '<button class="btn-cancel" onclick="closeForm(' + idx + ')">Cancel</button>' +
+          '<button class="btn-done" id="d-' + idx + '" onclick="submit(' + idx + ',' + b.row + ')">' +
+            (b.proposalLink ? 'Update ✓' : 'Mark Done ✓') + '</button>' +
+          '</div></div>';
+        out += '</div>'; // action-area
+
+        // Related Proposals — only for non-KLR
+        if (!isKlr) {
+          var dataAttrs =
+            ' data-brand="'     + esc(b.brand)                              + '"' +
+            ' data-campaign="'  + esc(b.project)                            + '"' +
+            ' data-industry="'  + esc(b.industry || '')                     + '"' +
+            ' data-deck="'      + esc(b.deck    || '')                      + '"' +
+            ' data-briefurls="' + esc(JSON.stringify(b.briefLinks || []))   + '"';
+
+          out += '<div class="related-section" id="relsec-' + idx + '">' +
+            '<button class="btn-related" id="relbtn-' + idx + '"' + dataAttrs +
+            ' onclick="loadRelated(this,' + idx + ')">✦ See Related Proposals</button>' +
+            '</div>';
+
+          out += '<div class="learnings-section" id="lrnsec-' + idx + '">' +
+            '<button class="btn-learnings" id="lrnbtn-' + idx + '"' + dataAttrs +
+            ' onclick="loadLearnings(this,' + idx + ')">📚 Past Learnings</button>' +
+            '</div>';
+
+          // Format Intel
+          out += '<div class="fintel-section" id="fintelsec-' + idx + '">' +
+            '<button class="btn-fintel" id="fintelbtn-' + idx + '"' +
+            ' data-brand="'    + esc(b.brand)                                    + '"' +
+            ' data-campaign="' + esc(b.project   || '')                          + '"' +
+            ' data-industry="' + esc(b.industry  || '')                          + '"' +
+            ' data-deck="'     + esc(b.deck      || '')                          + '"' +
+            ' data-summary="'  + esc((b.briefSummary || '').substring(0, 300))   + '"' +
+            ' onclick="loadFormatIntel(this,' + idx + ')"> Benchmarks & Samples</button>' +
+            '<div class="fintel-panel" id="fintelp-' + idx + '" style="display:none"></div>' +
+            '</div>';
+        }
+
+        // Handoff form (hidden): Now positioned immediately above the Reassign button
+        out += '<div class="handoff-form" id="hof-' + idx + '">';
+        out += '<select id="hos-' + idx + '"><option value="">Select strategist...</option>';
+        allStrats.forEach(function(s) {
+          if (s !== currentStrat) out += '<option value="' + esc(s) + '">' + esc(s) + '</option>';
+        });
+        out += '</select>';
+        out += '<div class="form-row" style="margin-top:10px">' +
+          '<button class="btn-cancel" onclick="cancelHandoff(' + idx + ')">Cancel</button>' +
+          '<button class="btn-done" onclick="doHandoff(' + idx + ',' + b.row + ')">Reassign ↗</button>' +
+          '</div></div>';
+
+        // Reassign — barely-there text link
+        out += '<div class="reassign-row">' +
+          '<span class="reassign-link" onclick="openHandoff(' + idx + ')">Reassign to someone else →</span>' +
+          '</div>';
+      }
+
+      out += '</div>'; // card
+      return out;
+    }
+
+    // ── Interactions ─────────────────────────────────────────────────────
+
+    function openForm(idx) {
+      var f = document.getElementById('f-' + idx);
+      f.classList.remove('closing');
+      f.classList.add('open');
+      var inp = document.getElementById('u-' + idx);
+      if (inp) { inp.focus(); inp.select(); }
+    }
+
+    function closeForm(idx) {
+      var f = document.getElementById('f-' + idx);
+      if(f) {
+        f.classList.add('closing');
+        setTimeout(function() {
+          f.classList.remove('open', 'closing');
+        }, 240);
+      }
+    }
+
+    function submit(idx, rowIndex) {
+      var link = (document.getElementById('u-' + idx) || {}).value || '';
+      link = link.trim();
+      var btn = document.getElementById('d-' + idx);
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            markDone(idx);
+            syncCounts();
+          } else {
+            alert('Error: ' + (res && res.error ? res.error : 'Unknown'));
+            if (btn) { btn.disabled = false; btn.textContent = 'Mark Done ✓'; }
+          }
+        })
+        .withFailureHandler(function(err) {
+          alert('Error: ' + err.message);
+          if (btn) { btn.disabled = false; btn.textContent = 'Mark Done ✓'; }
+        })
+        .submitProposal(rowIndex, link);
+    }
+
+    function markDone(idx) {
+      var c = document.getElementById('c-' + idx);
+      if (!c) return;
+      var isKlr = c.getAttribute('data-deck') === 'KLR';
+      c.className = 'card done';
+      // Update chip
+      var chip = c.querySelector('.dl-chip');
+      if (chip) { chip.className = 'dl-chip dl-done'; chip.textContent = '✓ Done'; }
+      // Remove action area + related section
+      var aa  = c.querySelector('.action-area');  if (aa)  aa.remove();
+      var rel = c.querySelector('.related-section'); if (rel) rel.remove();
+      // Add done check
+      var chk = document.createElement('div');
+      chk.className = 'done-check';
+      chk.textContent = isKlr ? '✓ KLR deck submitted' : '✓ Proposal submitted';
+      c.appendChild(chk);
+    }
+
+    function addTaskFromBtn(btn) {
+      var title    = btn.getAttribute('data-title') || '';
+      var notes    = btn.getAttribute('data-notes') || '';
+      var deadline = btn.getAttribute('data-deadline') || '';
+      btn.textContent = 'Adding…';
+      btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            btn.textContent = '✓ Added';
+            btn.style.opacity = '0.6';
+            try {
+              var rowNum = btn.getAttribute('data-row');
+              var added = JSON.parse(localStorage.getItem('tasksAdded') || '[]');
+              if (rowNum && added.indexOf(rowNum) === -1) added.push(rowNum);
+              localStorage.setItem('tasksAdded', JSON.stringify(added));
+            } catch(e) {}
+          } else {
+            btn.textContent = 'Add to Tasks';
+            btn.disabled = false;
+            alert('Failed: ' + (res && res.error ? res.error : 'Unknown error'));
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.textContent = 'Add to Tasks';
+          btn.disabled = false;
+          alert('Error: ' + err.message);
+        })
+        .addToGoogleTasks(title, notes, deadline);
+    }
+
+    function editDl(idx) {
+      document.getElementById('dlr-' + idx).style.display = 'none';
+      var f = document.getElementById('dlf-' + idx);
+      f.classList.remove('closing');
+      f.classList.add('open');
+      var inp = document.getElementById('dli-' + idx);
+      if (inp) inp.focus();
+    }
+
+    function cancelDl(idx) {
+      document.getElementById('dlr-' + idx).style.display = '';
+      var f = document.getElementById('dlf-' + idx);
+      if (f) {
+        f.classList.add('closing');
+        setTimeout(function() {
+          f.classList.remove('open', 'closing');
+        }, 240);
+      }
+    }
+
+    function saveDl(idx, rowIndex) {
+      var inp = document.getElementById('dli-' + idx);
+      if (!inp || !inp.value) return;
+      var parts = inp.value.split('-'); // yyyy-MM-dd
+      var ddmmyyyy = parts[2] + '/' + parts[1] + '/' + parts[0];
+      var saveBtn = document.getElementById('dlsave-' + idx);
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            var dlSpan = document.getElementById('dl-' + idx);
+            if (dlSpan) dlSpan.textContent = ddmmyyyy;
+            // Update the task button's deadline too
+            var taskBtn = document.getElementById('task-' + idx);
+            if (taskBtn) taskBtn.setAttribute('data-deadline', ddmmyyyy);
+            cancelDl(idx);
+          } else {
+            alert('Failed: ' + (res && res.error ? res.error : 'Unknown'));
+          }
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+        })
+        .withFailureHandler(function(err) {
+          alert('Error: ' + err.message);
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+        })
+        .updateDeadline(rowIndex, ddmmyyyy);
+    }
+
+    // ── KLR: clear "New Update" indicator when strategist opens the brief ──
+
+    function clearKlrUpdateFlag(row, el) {
+      // Remove the visual indicator immediately (no need to wait for backend)
+      var dot = el.querySelector('.new-update-dot');
+      if (dot) dot.remove();
+      el.classList.remove('klr-has-update');
+      // Clear the flag on the backend asynchronously
+      google.script.run.clearKlrUpdate(row);
+    }
+
+    function openBrief(sel) {
+      var url = sel.value;
+      if (!url) return;
+      window.open(url, '_blank');
+      setTimeout(function() { sel.selectedIndex = 0; }, 150);
+    }
+
+    function openAllLinks(urls) {
+      urls.forEach(function(url, i) {
+        setTimeout(function() { window.open(url, '_blank'); }, i * 200);
+      });
+    }
+
+    function openHandoff(idx) {
+      var form = document.getElementById('hof-' + idx);
+      form.classList.remove('closing');
+      form.classList.add('open');
+    }
+
+    // CHANGED: Added animated close to cancel handoff
+    function cancelHandoff(idx) {
+      var form = document.getElementById('hof-' + idx);
+      if (form) {
+        form.classList.add('closing');
+        setTimeout(function() {
+          form.classList.remove('open', 'closing');
+        }, 240); // Matches the CSS animation duration
+      }
+    }
+
+    function doHandoff(idx, rowIndex) {
+      var sel = document.getElementById('hos-' + idx);
+      var newStrat = sel ? sel.value : '';
+      if (!newStrat) { alert('Please select a strategist.'); return; }
+      var btns = document.querySelectorAll('#hof-' + idx + ' button');
+      btns.forEach(function(b) { b.disabled = true; });
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            cancelHandoff(idx);
+            var c = document.getElementById('c-' + idx);
+            if (c) {
+              var msg = document.createElement('div');
+              msg.className = 'done-check';
+              msg.textContent = '↗ Reassigned to ' + newStrat;
+              c.appendChild(msg);
+              setTimeout(function() { c.style.opacity = '0.5'; }, 300);
+            }
+          } else {
+            alert('Failed: ' + (res && res.error ? res.error : 'Unknown error'));
+            btns.forEach(function(b) { b.disabled = false; });
+          }
+        })
+        .withFailureHandler(function(err) {
+          alert('Error: ' + err.message);
+          btns.forEach(function(b) { b.disabled = false; });
+        })
+        .handoffBrief(rowIndex, newStrat);
+    }
+
+    function syncCounts() {
+      var pendingCount = document.querySelectorAll('.card:not(.done)').length;
+      var badge = document.getElementById('hBadge');
+      var sub   = document.getElementById('hSub');
+      if (pendingCount === 0) {
+        badge.style.display = 'none';
+        sub.textContent = 'All clear! 🎉';
+      } else {
+        badge.textContent = pendingCount;
+        sub.textContent = pendingCount + ' brief' + (pendingCount === 1 ? '' : 's') + ' to action';
+      }
+    }
+
+    // ── Related Proposals ────────────────────────────────────────────────
+
+    // Stores results + brief context per card so on-demand buttons can reference them
+    var _relCtx      = {};
+    var _relOriginal = {};
+    var _lrnOriginal = {};
+
+    function loadRelated(btn, idx) {
+      var sec = document.getElementById('relsec-' + idx);
+      if (!_relOriginal[idx]) _relOriginal[idx] = sec.innerHTML; // save BEFORE any changes
+      btn.disabled = true;
+      btn.textContent = 'Finding related proposals…';
+      var brand     = btn.getAttribute('data-brand')     || '';
+      var campaign  = btn.getAttribute('data-campaign')  || '';
+      var industry  = btn.getAttribute('data-industry')  || '';
+      var deck      = btn.getAttribute('data-deck')      || '';
+      var briefUrls = [];
+      try { briefUrls = JSON.parse(btn.getAttribute('data-briefurls') || '[]'); } catch(e) {}
+      google.script.run
+        .withSuccessHandler(function(res) {
+          try { renderRelated(idx, res, brand, campaign, industry, briefUrls); }
+          catch(e) {
+            var s = document.getElementById('relsec-' + idx);
+            if (s) s.innerHTML = '<div class="related-empty">Render error: ' + e.message + '</div>';
+            btn.textContent = 'See Related Proposals';
+            btn.disabled = false;
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (sec) sec.innerHTML =
+            '<div class="related-empty">Could not load: ' + esc(err.message) + '</div>';
+          btn.textContent = 'See Related Proposals';
+          btn.disabled = false;
+        })
+        .getRelatedProposals(brand, campaign, industry, deck, briefUrls);
+    }
+
+    function renderRelated(idx, res, brand, campaign, industry, briefUrls) {
+      var sec = document.getElementById('relsec-' + idx);
+      if (!sec) return;
+
+      if (!res || !res.results || res.results.length === 0) {
+        sec.innerHTML = '<div class="related-empty">No related proposals found.</div>';
+        return;
+      }
+
+      // Store context for on-demand analyse buttons (briefUrls passed directly — avoids large-string serialization issues)
+      _relCtx[idx] = { results: res.results, brand: brand, campaign: campaign, industry: industry,
+                       briefUrls: briefUrls || [] };
+
+      var yearCls = { '2023':'y2023', '2024':'y2024', '2025/26':'y202526' };
+      var html = '<div class="related-list">';
+      res.results.forEach(function(r, i) {
+        var cls     = yearCls[r.year] || 'y2023';
+        var wowHtml = i < 3
+          ? '<div class="ref-wow-loading" id="refwow-' + idx + '-' + i + '">✦ Analysing what stood out…</div>'
+          : '<div id="refwow-' + idx + '-' + i + '">' +
+              '<button class="btn-analyse" onclick="analyseOne(this,' + idx + ',' + i + ')">✦ Analyse this proposal</button>' +
+            '</div>';
+        html +=
+          '<div class="ref-item">' +
+            '<span class="ref-year ' + cls + '">' + esc(r.year) + '</span>' +
+            '<div class="ref-body">' +
+              '<div class="ref-brand">' + esc(r.brand) + '</div>' +
+              '<div class="ref-camp">'  + esc(r.campaign) + '</div>' +
+              (r.reason ? '<div class="ref-reason">' + esc(r.reason) + '</div>' : '') +
+              wowHtml +
+            '</div>' +
+            '<a class="ref-open" href="' + esc(r.link) + '" target="_blank">Open →</a>' +
+          '</div>';
+      });
+      html += '</div>';
+      html += '<div class="panel-collapse-bar" onclick="collapseRelated(' + idx + ')">↑ Collapse</div>';
+      // Product strip placeholder — filled after a separate backend call
+      html += '<div class="product-strip-wrap" id="prodstrip-' + idx + '">' +
+        '<div class="product-strip-label">Relevant Products</div>' +
+        '<div class="product-strip-loading">Finding matching products…</div>' +
+        '</div>';
+      sec.innerHTML = html;
+
+      // Fire insights call for top 3 immediately
+      var ctx = _relCtx[idx];
+      google.script.run
+        .withSuccessHandler(function(insights) { renderInsights(idx, insights); })
+        .withFailureHandler(function() { renderInsights(idx, []); })
+        .getProposalInsights(ctx.results, ctx.brand, ctx.campaign, ctx.industry, ctx.briefUrls);
+
+      // Fire product relevance call in parallel
+      google.script.run
+        .withSuccessHandler(function(products) { renderProducts(idx, products); })
+        .withFailureHandler(function() { renderProducts(idx, []); })
+        .getRelevantProducts(ctx.brand, ctx.campaign, ctx.industry, ctx.briefUrls);
+    }
+
+    function renderInsights(idx, insights) {
+      if (!insights) return;
+      insights.forEach(function(ins) {
+        var el = document.getElementById('refwow-' + idx + '-' + ins.index);
+        if (!el) return;
+        el.className = 'ref-wow';
+        el.textContent = ins.wow || '';
+      });
+      // Clear any loading states that got no result
+      for (var i = 0; i < 3; i++) {
+        var el = document.getElementById('refwow-' + idx + '-' + i);
+        if (el && el.className === 'ref-wow-loading') {
+          el.className = 'ref-wow';
+          el.textContent = '';
+        }
+      }
+    }
+
+    function renderProducts(idx, products) {
+      var wrap = document.getElementById('prodstrip-' + idx);
+      if (!wrap) return;
+      if (!products || !products.length) {
+        wrap.innerHTML = '';
+        return;
+      }
+      var yearCls = { '2026':'pyear-2026', '2025':'pyear-2025', '2024':'pyear-2024' };
+      var html = '<div class="product-strip-label">Relevant Products</div><div class="product-strip">';
+      products.forEach(function(p) {
+        var cls = yearCls[p.year] || 'pyear-other';
+        html +=
+          '<a class="product-card" href="' + esc(p.url) + '" target="_blank">' +
+            '<span class="product-year-badge ' + cls + '">' + esc(p.year) + '</span>' +
+            (p.concept ? '<div class="product-concept">' + esc(p.concept) + '</div>' : '') +
+            '<div class="product-name">' + esc(p.name) + '</div>' +
+            (p.description ? '<div class="product-desc">' + esc(p.description) + '</div>' : '') +
+            '<div class="product-open">Open deck →</div>' +
+          '</a>';
+      });
+      html += '</div>';
+      wrap.innerHTML = html;
+    }
+
+    // ── Past Learnings ────────────────────────────────────────────────────────
+
+    function loadLearnings(btn, idx) {
+      var sec = document.getElementById('lrnsec-' + idx);
+      if (!_lrnOriginal[idx]) _lrnOriginal[idx] = sec.innerHTML; // save BEFORE any changes
+      btn.disabled    = true;
+      btn.textContent = 'Finding case studies & learnings…';
+      var brand     = btn.getAttribute('data-brand')     || '';
+      var campaign  = btn.getAttribute('data-campaign')  || '';
+      var industry  = btn.getAttribute('data-industry')  || '';
+      var briefUrls = [];
+      try { briefUrls = JSON.parse(btn.getAttribute('data-briefurls') || '[]'); } catch(e) {}
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          renderLearnings(idx, res);
+          btn.textContent = '📚 Past Learnings';
+          btn.disabled = false;
+        })
+        .withFailureHandler(function(err) {
+          if (sec) sec.innerHTML = '<button class="btn-learnings" onclick="loadLearnings(this,' + idx + ')" ' +
+            'data-brand="' + esc(brand) + '" data-campaign="' + esc(campaign) + '" data-industry="' + esc(industry) + '" ' +
+            'data-briefurls="' + esc(JSON.stringify(briefUrls)) + '">📚 Past Learnings</button>' +
+            '<div class="learnings-error">Could not load: ' + esc(err.message || 'unknown error') + '</div>';
+        })
+        .getRelevantCaseStudies(brand, campaign, industry, briefUrls);
+    }
+
+    function renderLearnings(idx, res) {
+      var sec = document.getElementById('lrnsec-' + idx);
+      if (!sec) return;
+
+      if (!res || res.empty || (!res.casestudies.length && !res.keylearnings.length)) {
+        sec.innerHTML = '<div class="learnings-empty">No matching case studies or key learnings found yet — run the indexing job to populate the index.</div>';
+        return;
+      }
+
+      var yearCls = { '2023':'y2023', '2024':'y2024', '2025/26':'y202526', '2025':'y2025', '2026':'y2026' };
+      var uid = 0;
+
+      var csItems = res.casestudies;
+      var klItems = res.keylearnings;
+      var csInsightIds = [];
+      var klInsightIds = [];
+
+      function itemHtml(item, type, typeIdx) {
+        var cls    = yearCls[item.year] || 'y2023';
+        var cardId = 'lcard-' + idx + '-' + (uid++);
+        var insightId = 'lins-' + idx + '-' + type + '-' + typeIdx;
+        var accentCls = type === 'cs' ? 'lrn-card-cs' : 'lrn-card-kl';
+        if (type === 'cs') csInsightIds.push(insightId);
+        else               klInsightIds.push(insightId);
+        return '<div class="lrn-card ' + accentCls + '" id="' + cardId + '" onclick="toggleLearning(\'' + cardId + '\')">' +
+          '<div class="lrn-card-top">' +
+            '<div class="lrn-card-left">' +
+              '<span class="ref-year ' + cls + '">' + esc(item.year) + '</span>' +
+              '<div class="lrn-card-meta">' +
+                '<div class="lrn-card-title">' + esc(item.brand || item.name) + '</div>' +
+                (item.campaign ? '<div class="lrn-card-sub">' + esc(item.campaign) + '</div>' : '') +
+              '</div>' +
+            '</div>' +
+            '<span class="lrn-chevron" id="' + cardId + '-chev">›</span>' +
+          '</div>' +
+          '<div class="lrn-card-expand" id="' + cardId + '-expand">' +
+            '<div class="lrn-full-summary lrn-insight-loading" id="' + insightId + '">✦ Connecting to your brief…</div>' +
+            '<a class="lrn-open-link" href="' + esc(item.url) + '" target="_blank" onclick="event.stopPropagation()">Open deck →</a>' +
+          '</div>' +
+        '</div>';
+      }
+
+      var html = '<div class="learnings-panel">';
+
+      if (csItems.length) {
+        html += '<div class="learnings-col-header cs-header">✅ What Worked</div>';
+        csItems.forEach(function(item, i) { html += itemHtml(item, 'cs', i); });
+      }
+
+      if (klItems.length) {
+        html += '<div class="learnings-col-header kl-header"' + (csItems.length ? ' style="margin-top:12px"' : '') + '>⚠️ Watch Out For</div>';
+        klItems.forEach(function(item, i) { html += itemHtml(item, 'kl', i); });
+      }
+
+      html += '</div>';
+      html += '<div class="panel-collapse-bar" onclick="collapseLearnings(' + idx + ')">↑ Collapse</div>';
+      sec.innerHTML = html;
+
+      // Fire brief-aware insight call for top 2 CS + top 2 KL
+      var btn2    = document.getElementById('lrnbtn-' + idx);
+      var brand2  = btn2 ? btn2.getAttribute('data-brand')    || '' : '';
+      var camp2   = btn2 ? btn2.getAttribute('data-campaign') || '' : '';
+      var ind2    = btn2 ? btn2.getAttribute('data-industry') || '' : '';
+      var urls2   = [];
+      if (btn2) { try { urls2 = JSON.parse(btn2.getAttribute('data-briefurls') || '[]'); } catch(e) {} }
+      google.script.run
+        .withSuccessHandler(function(ins) { renderCsKlInsights(idx, ins, csInsightIds, klInsightIds); })
+        .withFailureHandler(function()    { renderCsKlInsights(idx, null, csInsightIds, klInsightIds); })
+        .getCaseStudyInsights(csItems.slice(0,3), klItems.slice(0,3), brand2, camp2, ind2, urls2);
+    }
+
+    function renderCsKlInsights(idx, ins, csIds, klIds) {
+      function fill(ids, arr) {
+        // Match by position — don't trust Gemini's index field
+        (arr || []).forEach(function(item, pos) {
+          var el = document.getElementById(ids[pos]);
+          if (!el) return;
+          el.classList.remove('lrn-insight-loading');
+          el.textContent = item.insight || '';
+        });
+        // Clear any still-loading states
+        ids.forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el && el.classList.contains('lrn-insight-loading')) {
+            el.classList.remove('lrn-insight-loading');
+            el.textContent = '';
+          }
+        });
+      }
+      if (!ins) { fill(csIds, []); fill(klIds, []); return; }
+      fill(csIds, ins.casestudies || []);
+      fill(klIds, ins.keylearnings || []);
+    }
+
+    // CHANGED: Added animated close for Related Proposals
+    function collapseRelated(idx) {
+      var sec = document.getElementById('relsec-' + idx);
+      if (sec && _relOriginal[idx]) {
+        sec.style.animation = 'fadeOutUp 0.25s ease forwards';
+        setTimeout(function() {
+          sec.innerHTML = _relOriginal[idx];
+          sec.style.animation = ''; // Reset animation so it can trigger next time
+        }, 240);
+      }
+    }
+
+    // CHANGED: Added animated close for Past Learnings
+    function collapseLearnings(idx) {
+      var sec = document.getElementById('lrnsec-' + idx);
+      if (sec && _lrnOriginal[idx]) {
+        sec.style.animation = 'fadeOutUp 0.25s ease forwards';
+        setTimeout(function() {
+          sec.innerHTML = _lrnOriginal[idx];
+          sec.style.animation = '';
+        }, 240);
+      }
+    }
+
+    // ── Format Intel ─────────────────────────────────────────────────────
+
+    function loadFormatIntel(btn, idx) {
+      var brand    = btn.getAttribute('data-brand')    || '';
+      var campaign = btn.getAttribute('data-campaign') || '';
+      var industry = btn.getAttribute('data-industry') || '';
+      var deck     = btn.getAttribute('data-deck')     || '';
+      var summary  = btn.getAttribute('data-summary')  || '';
+
+      btn.style.display = 'none';
+      var panel = document.getElementById('fintelp-' + idx);
+      panel.style.display = 'block';
+      panel.innerHTML = '<div class="fintel-loading">Analysing brief for format benchmarks…</div>';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (!result || !result.success) {
+            panel.innerHTML =
+              '<div class="fintel-error">' + esc(result && result.error ? result.error : 'Error loading data') + '</div>' +
+              '<div class="panel-collapse-bar" onclick="collapseFintel(' + idx + ')">↑ Collapse</div>';
+            return;
+          }
+          if (!result.groups || !result.groups.length) {
+            panel.innerHTML =
+              '<div class="fintel-loading">No specific formats identified in this brief.</div>' +
+              '<div class="panel-collapse-bar" onclick="collapseFintel(' + idx + ')">↑ Collapse</div>';
+            return;
+          }
+          renderFormatIntel(result.groups, idx);
+        })
+        .withFailureHandler(function(err) {
+          var p = document.getElementById('fintelp-' + idx);
+          if (p) p.innerHTML =
+            '<div class="fintel-error">Error: ' + esc(err.message || '') + '</div>' +
+            '<div class="panel-collapse-bar" onclick="collapseFintel(' + idx + ')">↑ Collapse</div>';
+        })
+        .getBriefFormatIntel(brand, campaign, industry, summary, deck);
+    }
+
+    function renderFormatIntel(groups, idx) {
+      var panel = document.getElementById('fintelp-' + idx);
+      if (!panel) return;
+
+      var html = '';
+
+      groups.forEach(function(g) {
+        html += '<div class="fintel-group">';
+
+        // Label + type chips
+        html += '<div class="fintel-group-label">' + esc(g.label || 'Format Group');
+        (g.types || []).forEach(function(t) {
+          html += ' <span class="fintel-type-tag">' + esc(t) + '</span>';
+        });
+        html += '</div>';
+
+        if (g.rationale) {
+          html += '<div class="fintel-rationale">' + esc(g.rationale) + '</div>';
+        }
+
+        if (!g.count) {
+          html += '<div class="fintel-no-data">No past campaigns found for this format.</div>';
+        } else {
+          // Stats
+          var erLabel = g.avgEr !== null
+            ? (g.erCount < g.count ? 'Avg ER% (' + g.erCount + ' with data)' : 'Avg ER%')
+            : 'Avg ER%';
+          html += '<div class="fintel-stats">';
+          html += '<div class="fintel-stat-block">' +
+            '<div class="fintel-stat-val">' + (g.avgEr !== null ? g.avgEr.toFixed(2) + '%' : '—') + '</div>' +
+            '<div class="fintel-stat-lbl">' + esc(erLabel) + '</div></div>';
+          html += '<div class="fintel-stat-div"></div>';
+          html += '<div class="fintel-stat-block">' +
+            '<div class="fintel-stat-val dim">' + g.count + '</div>' +
+            '<div class="fintel-stat-lbl">Campaigns tracked</div></div>';
+          html += '</div>'; // fintel-stats
+
+          if (g.top3 && g.top3.length) {
+            html += '<div class="fintel-performers">';
+            html += '<div class="fintel-perf-label">' + (g.erCount ? 'Top performers' : 'Recent campaigns') + '</div>';
+            g.top3.forEach(function(r) {
+              var erVal = parseFloat(r.er);
+              var erStr = !isNaN(erVal) && erVal > 0 ? erVal.toFixed(2) + '%' : '—';
+              html += '<div class="fintel-perf-row">';
+              html += '<div class="fintel-perf-name">' + esc(r.brand || '—') + '</div>';
+              html += '<span class="fintel-perf-type">' + esc(r.type || '') + '</span>';
+              html += '<span class="fintel-perf-er">' + esc(erStr) + '</span>';
+              if (r.link) {
+                html += '<a class="fintel-perf-link" href="' + esc(r.link) + '" target="_blank" rel="noopener">View →</a>';
+              } else {
+                html += '<span style="font-size:11px;color:#ddd;flex-shrink:0">No link</span>';
+              }
+              html += '</div>';
+            });
+            html += '</div>'; // fintel-performers
+          }
+
+          if (g.median3 && g.median3.length) {
+            html += '<div class="fintel-performers" style="margin-top: 16px; border-top: 1px dashed var(--border-light); padding-top: 16px;">';
+            html += '<div class="fintel-perf-label">Median performers (Realistic expectations)</div>';
+            g.median3.forEach(function(r) {
+              var erVal = parseFloat(r.er);
+              var erStr = !isNaN(erVal) && erVal > 0 ? erVal.toFixed(2) + '%' : '—';
+              html += '<div class="fintel-perf-row">';
+              html += '<div class="fintel-perf-name">' + esc(r.brand || '—') + '</div>';
+              html += '<span class="fintel-perf-type">' + esc(r.type || '') + '</span>';
+              html += '<span class="fintel-perf-er">' + esc(erStr) + '</span>';
+              if (r.link) {
+                html += '<a class="fintel-perf-link" href="' + esc(r.link) + '" target="_blank" rel="noopener">View →</a>';
+              } else {
+                html += '<span style="font-size:11px;color:#ddd;flex-shrink:0">No link</span>';
+              }
+              html += '</div>';
+            });
+            html += '</div>'; // fintel-performers
+          }
+        }
+
+        html += '</div>'; // fintel-group
+      });
+
+      html += '<div class="panel-collapse-bar" onclick="collapseFintel(' + idx + ')">↑ Collapse</div>';
+      panel.innerHTML = html;
+    }
+
+    // CHANGED: Added animated close for Format Intel
+    function collapseFintel(idx) {
+      var panel = document.getElementById('fintelp-' + idx);
+      var btn   = document.getElementById('fintelbtn-' + idx);
+      if (panel) {
+        panel.style.animation = 'fadeOutUp 0.25s ease forwards';
+        setTimeout(function() {
+          panel.style.display = 'none';
+          panel.style.animation = ''; // Reset animation so it can trigger next time
+          if (btn) btn.style.display = '';
+        }, 240);
+      }
+    }
+
+    function toggleLearning(cardId) {
+      var expand = document.getElementById(cardId + '-expand');
+      var chev   = document.getElementById(cardId + '-chev');
+      var card   = document.getElementById(cardId);
+      if (!expand) return;
+      var open = expand.classList.toggle('lrn-card-open');
+      if (card) card.classList.toggle('lrn-card-active', open);
+    }
+
+    function renderMarquee(products) {
+      var section = document.getElementById('product-marquee-section');
+      // render() may not have run yet — retry until the placeholder exists
+      if (!section) {
+        setTimeout(function() { renderMarquee(products); }, 400);
+        return;
+      }
+      if (!products || !products.length) return;
+      // Shuffle
+      products = products.slice().sort(function() { return Math.random() - 0.5; });
+      var yearCls = { '2026':'pyear-2026', '2025':'pyear-2025', '2024':'pyear-2024' };
+      // Build cards HTML (duplicated for seamless loop)
+      function makeCards(list) {
+        return list.map(function(p) {
+          var cls = yearCls[p.year] || 'pyear-other';
+          return '<a class="marquee-card" href="' + esc(p.url) + '" target="_blank">' +
+            '<span class="product-year-badge ' + cls + '">' + esc(p.year) + '</span>' +
+            (p.concept ? '<div class="marquee-concept">' + esc(p.concept) + '</div>' : '') +
+            '<div class="marquee-name">' + esc(p.name) + '</div>' +
+            (p.description ? '<div class="marquee-desc">' + esc(p.description) + '</div>' : '') +
+            '<div class="marquee-open">Open deck →</div>' +
+          '</a>';
+        }).join('');
+      }
+      var cards = makeCards(products);
+      section.innerHTML =
+        '<div class="marquee-section">' +
+          '<div class="marquee-label">✦ Psst — we have these too</div>' +
+          '<div class="marquee-track-wrap">' +
+            '<div class="marquee-track">' +
+              cards + cards + // duplicate for seamless loop
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function analyseOne(btn, idx, resultI) {
+      btn.disabled = true;
+      btn.textContent = '✦ Analysing…';
+      var ctx = _relCtx[idx];
+      if (!ctx) return;
+      google.script.run
+        .withSuccessHandler(function(wow) {
+          var el = document.getElementById('refwow-' + idx + '-' + resultI);
+          if (el) { el.className = 'ref-wow'; el.textContent = wow || ''; }
+        })
+        .withFailureHandler(function() {
+          var el = document.getElementById('refwow-' + idx + '-' + resultI);
+          if (el) el.innerHTML = '';
+        })
+        .getSingleInsight(ctx.results[resultI], ctx.brand, ctx.campaign, ctx.industry, ctx.briefUrls);
+    }
+
+    // ── Auto-refresh ─────────────────────────────────────────────────────
+    // Silently re-fetches pending briefs every 60 seconds.
+    // If the count or update badges changed, prompts the strategist to reload.
+
+    var _lastPendingCount = -1;
+    var _lastUpdateKeys   = '';
+    var _refreshBusy      = false;
+
+    function silentRefresh() {
+      if (_refreshBusy) return;
+      _refreshBusy = true;
+      google.script.run
+        .withSuccessHandler(function(data) {
+          _refreshBusy = false;
+          if (!data || !data.found) return;
+
+          var newCount = (data.briefs || []).length;
+
+          // Build a fingerprint of which rows have update badges
+          var updateKeys = (data.briefs || [])
+            .filter(function(b) { return b.hasUpdate; })
+            .map(function(b) { return b.row; })
+            .sort().join(',');
+
+          var changed = (_lastPendingCount !== -1) &&
+                        (newCount !== _lastPendingCount || updateKeys !== _lastUpdateKeys);
+
+          _lastPendingCount = newCount;
+          _lastUpdateKeys   = updateKeys;
+
+          if (changed) {
+            showRefreshBanner();
+          }
+        })
+        .withFailureHandler(function() { _refreshBusy = false; })
+        .getStrategistData(false);
+    }
+
+    function showRefreshBanner() {
+      if (document.getElementById('refresh-banner')) return; // already showing
+      var banner = document.createElement('div');
+      banner.id = 'refresh-banner';
+      banner.style.cssText =
+        'position:fixed;top:0;left:0;right:0;z-index:9999;background:#0066cc;color:#fff;' +
+        'text-align:center;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;' +
+        'box-shadow:0 4px 12px rgba(0,0,0,0.2); animation: fadeInUp 0.4s ease-out;';
+      banner.textContent = '🔄 New updates available — tap to refresh';
+      banner.onclick = function() { location.reload(); };
+      document.body.prepend(banner);
+    }
+
+    // ── Boot ─────────────────────────────────────────────────────────────
+
+    window.onload = function() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          render(data);
+          if (data && data.found) {
+            _lastPendingCount = (data.briefs || []).length;
+            _lastUpdateKeys   = (data.briefs || [])
+              .filter(function(b) { return b.hasUpdate; })
+              .map(function(b) { return b.row; })
+              .sort().join(',');
+          }
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('container').innerHTML =
+            '<div class="state-screen"><div class="state-icon">⚠️</div>' +
+            '<div class="state-title">Something went wrong</div>' +
+            '<div class="state-sub">' + esc(err.message) + '</div></div>';
+        })
+        .getStrategistData(false);
+
+      // Load product marquee independently — doesn't block main render
+      google.script.run
+        .withSuccessHandler(renderMarquee)
+        .withFailureHandler(function() {})
+        .getAllProducts();
+
+      // Poll every hour, but only when tab is visible
+      setInterval(function() {
+        if (document.visibilityState === 'visible') silentRefresh();
+      }, 3600000);
+    };
+  </script>
+</body>
+</html>
