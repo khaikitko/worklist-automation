@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StratOS — Strategy Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  :root{
+    --accent:#6D5BE0; --accent-strong:#5A48CC;
+    --accent-30:rgba(109,91,224,.30); --accent-20:rgba(109,91,224,.20);
+    --accent-10:rgba(109,91,224,.10); --accent-08:rgba(109,91,224,.08);
+    --bg:#F6F6F7; --ink:#1F1F23; --muted:#86868E; --line:#EEEEF0;
+    --red:#E11D48; --amber:#F59E0B; --green:#16A34A; --violet:#8B5CF6;
+  }
+  body{ background:var(--bg); color:var(--ink); min-height:100vh;
+    font-family:'Plus Jakarta Sans',-apple-system,system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  @keyframes so-spin{ to{ transform:rotate(360deg);} }
+  @keyframes so-pulse{ 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.35; transform:scale(.7);} }
+  @keyframes so-fade{ from{ opacity:0; transform:translateY(12px);} to{ opacity:1; transform:translateY(0);} }
+  @keyframes so-pop{ 0%{ opacity:0; transform:scale(.96) translateY(6px);} 100%{ opacity:1; transform:scale(1) translateY(0);} }
+  ::-webkit-scrollbar{ height:10px; width:10px; }
+  ::-webkit-scrollbar-thumb{ background:#DcDcE0; border-radius:20px; border:3px solid var(--bg); }
+  button{ font-family:inherit; }
+  .wrap{ padding-left:clamp(24px,4vw,56px); padding-right:clamp(24px,4vw,56px); }
+
+  /* NAV */
+  header.topnav{ position:sticky; top:0; z-index:40; background:rgba(255,255,255,.82);
+    backdrop-filter:saturate(180%) blur(14px); -webkit-backdrop-filter:saturate(180%) blur(14px);
+    border-bottom:1px solid #ECECEF; }
+  .topnav-inner{ display:flex; align-items:center; justify-content:space-between; padding:16px clamp(24px,4vw,56px); }
+  .logo{ display:flex; align-items:center; gap:12px; }
+  .logo-mark{ width:38px; height:38px; border-radius:13px; background:var(--accent);
+    display:flex; align-items:center; justify-content:center; gap:3px; box-shadow:0 6px 16px var(--accent-30); }
+  .logo-mark span{ width:4px; height:14px; background:#fff; border-radius:2px; display:block; }
+  .logo b{ font-weight:800; font-size:20px; letter-spacing:-.02em; }
+  .seg{ display:flex; align-items:center; gap:6px; background:#F1F1F3; padding:5px; border-radius:14px; }
+  .seg button{ border:none; cursor:pointer; display:flex; align-items:center; gap:8px; padding:9px 16px; border-radius:10px;
+    font-weight:700; font-size:13.5px; letter-spacing:.02em; color:var(--muted); background:transparent; box-shadow:none;
+    transition:all .25s cubic-bezier(.2,.8,.2,1); }
+  .seg button.on{ background:#fff; color:var(--accent); box-shadow:0 2px 8px rgba(17,12,46,.10); }
+  .seg svg{ display:block; }
+
+  /* STATUS ROW */
+  .statusrow{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; padding-top:18px; }
+  .live{ display:flex; align-items:center; gap:10px; font-size:13.5px; color:#717177; }
+  .dot{ width:8px; height:8px; border-radius:50%; background:#22C55E; display:inline-block; animation:so-pulse 2s ease-in-out infinite; }
+  .live b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+  .sep{ color:#C9C9CF; }
+  .refresh{ display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #E6E6EA; border-radius:12px;
+    padding:10px 16px; font-weight:700; font-size:13.5px; color:var(--ink); cursor:pointer; box-shadow:0 2px 8px rgba(17,12,46,.04); transition:all .2s; }
+  .refresh:hover{ border-color:var(--accent); color:var(--accent); transform:translateY(-1px); }
+
+  /* PERIOD ROW */
+  .periodrow{ display:flex; align-items:center; flex-wrap:wrap; gap:14px; padding-top:18px; padding-bottom:4px; }
+  .periodrow .lbl{ font-weight:700; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A9AA2; }
+
+  main{ padding-top:14px; padding-bottom:64px; }
+  .page{ display:none; animation:so-fade .45s ease; }
+  .page.on{ display:block; }
+  h3.card-h{ margin:0; font-size:19px; font-weight:800; letter-spacing:-.02em; }
+  p.card-sub{ margin:4px 0 28px; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#A6A6AE; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:20px; box-shadow:0 4px 16px rgba(17,12,46,.05); }
+
+  /* KPI */
+  .kpi-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:20px; margin-bottom:20px; }
+  .kpi{ padding:24px; transition:transform .25s, box-shadow .25s; }
+  .kpi:hover{ transform:translateY(-3px); box-shadow:0 14px 32px rgba(17,12,46,.10); }
+  .kpi-top{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .kpi-ico{ width:42px; height:42px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:800; }
+  .kpi-lbl{ font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#9A9AA2; line-height:1.3; }
+  .kpi-val{ font-weight:800; font-size:29px; letter-spacing:-.025em; line-height:1; font-variant-numeric:tabular-nums; }
+
+  /* MAIN GRID */
+  .grid-2{ display:grid; grid-template-columns:1fr 380px; gap:20px; margin-bottom:20px; }
+  .chartcard{ padding:28px; display:flex; flex-direction:column; }
+  .bars{ display:flex; align-items:flex-end; gap:clamp(16px,3vw,48px); flex:1; min-height:240px; padding-left:24px; position:relative; }
+  .yaxis{ position:absolute; left:0; top:0; bottom:24px; display:flex; flex-direction:column; justify-content:space-between;
+    font-size:11px; color:#B7B7BE; font-weight:600; }
+  .bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; min-width:0; }
+  .bar{ width:100%; max-width:120px; background:linear-gradient(180deg,var(--accent),var(--accent-strong));
+    border-radius:12px 12px 4px 4px; height:0; transition:height 1s cubic-bezier(.16,1,.3,1); box-shadow:0 6px 16px var(--accent-20); }
+  .bar-name{ margin-top:12px; font-size:13.5px; font-weight:700; color:#52525A; white-space:nowrap; }
+
+  /* AT RISK */
+  .risk{ background:#fff; border:1px solid #FBD9DF; border-radius:20px; padding:24px; box-shadow:0 4px 16px rgba(225,29,72,.06); }
+  .risk-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:18px; }
+  .risk-title{ display:flex; align-items:center; gap:8px; color:var(--red); }
+  .risk-title h3{ margin:0; font-size:17px; font-weight:800; letter-spacing:-.02em; color:var(--ink); }
+  .risk-tag{ margin:5px 0 0; font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--red); }
+  .risk-amt{ font-weight:800; font-size:22px; color:var(--red); letter-spacing:-.02em; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .risk-cnt{ font-size:11px; font-weight:700; color:#CA8A6B; text-align:right; }
+  .risk-list{ display:flex; flex-direction:column; gap:14px; }
+  .risk-item{ padding-bottom:14px; border-bottom:1px solid #F2F2F4; }
+  .risk-item:last-child{ border-bottom:none; padding-bottom:0; }
+  .risk-client{ font-weight:800; font-size:14.5px; }
+  .risk-proj{ margin:3px 0 8px; font-size:12.5px; color:var(--muted); line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .risk-people{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; }
+  .risk-meta{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:7px; }
+  .risk-due{ display:flex; align-items:center; gap:5px; font-size:12px; font-weight:800; color:var(--red); white-space:nowrap; }
+  .risk-val{ font-size:13px; font-weight:800; white-space:nowrap; }
+  .empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#C4C4CC; padding:30px 0; }
+  .empty span{ font-size:11px; font-weight:800; letter-spacing:.08em; }
+
+  /* DECKS */
+  .decks{ padding:28px; margin-bottom:24px; }
+  .decks-wrap{ display:flex; align-items:flex-end; gap:clamp(6px,1vw,14px); height:230px; padding-left:28px; position:relative; }
+  .decks-wrap .bar{ max-width:46px; border-radius:9px 9px 3px 3px; box-shadow:none; }
+  .decks-name{ margin-top:10px; font-size:11px; font-weight:600; color:var(--muted); white-space:nowrap; }
+
+  /* SECONDARY */
+  .sec-head{ display:flex; align-items:center; gap:9px; margin:28px 0 18px; }
+  .sec-head .star{ color:var(--amber); font-size:15px; }
+  .sec-head span.t{ font-weight:800; font-size:12.5px; letter-spacing:.12em; text-transform:uppercase; color:#52525A; }
+  .lead-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-bottom:20px; }
+  .lead{ padding:24px; }
+  .lead-h{ display:flex; align-items:center; gap:9px; margin-bottom:18px; }
+  .lead-h span.ico{ display:flex; color:var(--accent); }
+  .lead-h span.t{ font-weight:800; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:#52525A; }
+  .lead-row{ display:flex; align-items:center; gap:12px; padding:9px 8px; border-radius:11px; transition:background .15s; }
+  .lead-row:hover{ background:#F8F8FA; }
+  .rank{ width:26px; height:26px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex:none; }
+  .lead-name{ font-weight:700; font-size:14.5px; flex:1; }
+  .lead-val{ font-weight:800; font-size:14px; color:var(--accent); }
+
+  /* DONUT + CATEGORIES */
+  .grid-dc{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .donut-wrap{ display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+  .donut{ position:relative; width:200px; height:200px; flex:none; }
+  .donut .ring{ position:absolute; inset:0; border-radius:50%; opacity:0; transform:rotate(-120deg) scale(.85);
+    transition:transform .9s cubic-bezier(.16,1,.3,1), opacity .9s; }
+  .donut .hole{ position:absolute; inset:34px; border-radius:50%; background:#fff; }
+  .legend{ display:flex; flex-direction:column; gap:9px; flex:1; min-width:160px; }
+  .legend-row{ display:flex; align-items:center; gap:9px; font-size:12.5px; font-weight:600; color:#52525A; }
+  .legend-row span.sw{ width:11px; height:11px; border-radius:4px; flex:none; }
+  .cat-row{ display:flex; align-items:center; gap:14px; margin-bottom:12px; }
+  .cat-name{ width:120px; text-align:right; font-size:12.5px; font-weight:600; color:#52525A; flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cat-track{ flex:1; height:18px; background:#F2F2F5; border-radius:6px; overflow:hidden; }
+  .cat-fill{ height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent-strong)); border-radius:6px; transition:width 1s cubic-bezier(.16,1,.3,1); }
+
+  /* KANBAN */
+  .kan-head{ display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:8px; }
+  .kan-head h2{ margin:0; font-size:26px; font-weight:800; letter-spacing:-.03em; }
+  .kan-head p{ margin:5px 0 0; font-size:14px; color:var(--muted); }
+  .kan-legend{ display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  .kan-legend span{ display:flex; align-items:center; gap:7px; font-size:11.5px; font-weight:800; letter-spacing:.06em; color:#52525A; }
+  .kan-legend i{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .pod{ margin-top:32px; }
+  .pod-top{ display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .pod-name{ margin:0; font-size:19px; font-weight:800; letter-spacing:-.02em; display:flex; align-items:center; gap:11px; }
+  .pod-name i{ width:5px; height:20px; border-radius:3px; background:var(--accent); display:inline-block; }
+  .pod-stats{ display:flex; gap:32px; }
+  .pod-stat{ text-align:right; }
+  .pod-stat .k{ font-size:10.5px; font-weight:800; letter-spacing:.1em; color:#A6A6AE; }
+  .pod-stat .v{ font-weight:800; font-size:18px; color:var(--accent); }
+  .pod-rule{ height:3px; background:linear-gradient(90deg,var(--accent),var(--accent-20)); border-radius:3px; margin:12px 0 20px; }
+  .pod-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:20px; }
+  .strat{ background:#fff; border:1.5px solid #EFEFF1; border-radius:18px; padding:20px; box-shadow:0 4px 16px rgba(17,12,46,.05);
+    min-height:280px; display:flex; flex-direction:column; }
+  .strat-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .strat-name{ font-weight:800; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .strat-val{ font-weight:800; font-size:24px; letter-spacing:-.02em; }
+  .strat-active{ font-size:11.5px; font-weight:800; letter-spacing:.06em; color:var(--accent); margin:2px 0 16px; }
+  .strat-items{ display:flex; flex-direction:column; gap:10px; }
+  .ticket{ border-left:3px solid var(--accent); background:var(--accent-08); border-radius:9px; padding:11px 13px; transition:transform .15s, box-shadow .15s; }
+  .ticket:hover{ transform:translateY(-2px); box-shadow:0 8px 20px rgba(17,12,46,.10); }
+  .ticket.over{ border-left-color:var(--red); background:#FEF2F2; }
+  .ticket.soon{ border-left-color:var(--amber); background:#FFFBEB; }
+  .ticket-client{ font-weight:800; font-size:13.5px; line-height:1.25; }
+  .ticket.over .ticket-client{ color:var(--red); }
+  .ticket-proj{ font-size:11.5px; color:var(--muted); margin:2px 0 7px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ticket-due{ display:flex; align-items:center; gap:5px; font-size:11px; font-weight:700; color:var(--muted); }
+
+  /* SEARCH */
+  .search-bar{ padding:20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+  .search-in{ flex:1; min-width:240px; display:flex; align-items:center; gap:11px; background:#F6F6F8; border:1px solid #ECECEF; border-radius:13px; padding:13px 16px; }
+  .search-in input{ border:none; background:none; outline:none; font-family:inherit; font-size:14.5px; width:100%; color:var(--ink); }
+  .results{ overflow:hidden; }
+  .thead, .trow{ display:grid; grid-template-columns:200px 1fr 130px 110px 140px 120px; gap:16px; align-items:center; }
+  .thead{ padding:16px 24px; border-bottom:1px solid #EFEFF1; }
+  .thead span{ font-weight:800; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#A6A6AE; }
+  .trow{ padding:18px 24px; border-bottom:1px solid #F4F4F6; transition:background .15s; }
+  .trow:hover{ background:#FAFAFB; }
+  .id-badge{ display:inline-block; font-weight:800; font-size:11px; letter-spacing:.04em; color:var(--accent); background:var(--accent-08); padding:3px 9px; border-radius:7px; margin-bottom:5px; }
+  .t-brand{ font-weight:800; font-size:14px; }
+  .t-proj{ font-size:14px; color:#3A3A42; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .t-strat{ font-size:14px; font-weight:600; }
+  .status-badge{ display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:12px; padding:5px 11px; border-radius:20px; }
+  .status-badge i{ width:6px; height:6px; border-radius:50%; }
+  .t-budget{ font-weight:800; font-size:14px; text-align:right; }
+  .t-deadline{ font-size:13px; color:var(--muted); text-align:right; }
+  .t-deadline.over{ color:var(--red); font-weight:800; }
+  .pager{ display:flex; align-items:center; justify-content:space-between; padding:16px 24px; }
+  .pager-info{ font-size:13px; color:var(--muted); }
+  .pager-btns{ display:flex; gap:4px; }
+  .pager-btns button{ padding:6px 12px; border-radius:8px; border:1px solid var(--line); cursor:pointer; font-size:12px; font-weight:700; background:#fff; color:var(--ink); transition:all .15s; }
+  .pager-btns button:hover:not(:disabled){ background:var(--bg); }
+  .pager-btns button.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .pager-btns button:disabled{ opacity:.4; cursor:not-allowed; }
+
+  @media (max-width:980px){
+    .kpi-grid{ grid-template-columns:repeat(2,1fr); }
+    .grid-2,.grid-dc,.lead-grid{ grid-template-columns:1fr; }
+    .thead{ display:none; }
+    .trow{ grid-template-columns:1fr 1fr; gap:8px; padding:14px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topnav">
+  <div class="topnav-inner">
+    <div class="logo">
+      <div class="logo-mark"><span></span><span></span></div>
+      <b>StratOS</b>
+    </div>
+    <nav class="seg" id="nav"></nav>
+  </div>
+</header>
+
+<div class="wrap statusrow">
+  <div class="live">
+    <span class="dot"></span>
+    <span>Live — data as of <b id="gen-at">—</b></span>
+    <span class="sep">·</span>
+    <span>Auto-refreshing in <b id="countdown">60:00</b></span>
+  </div>
+  <button class="refresh" onclick="location.reload()">
+    <span id="refresh-ico" style="display:flex;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></span>
+    Refresh Now
+  </button>
+</div>
+
+<div class="wrap periodrow" id="period-row">
+  <span class="lbl">Period</span>
+  <div class="seg" id="period"></div>
+</div>
+
+<main class="wrap">
+
+  <!-- DASHBOARD -->
+  <section id="page-dashboard" class="page on">
+    <div class="kpi-grid" id="kpis"></div>
+
+    <div class="grid-2">
+      <div class="card chartcard">
+        <h3 class="card-h">Strategist Workload</h3>
+        <p class="card-sub">Number of pending / ongoing proposals</p>
+        <div class="bars" id="workload"><div class="yaxis" id="workload-y"></div></div>
+      </div>
+      <div class="risk">
+        <div class="risk-head">
+          <div style="min-width:0;">
+            <div class="risk-title">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17.4v.01"/></svg>
+              <h3>At-Risk Value</h3>
+            </div>
+            <p class="risk-tag">Past deadline &amp; not done</p>
+          </div>
+          <div style="flex:none;">
+            <div class="risk-amt" id="risk-amt">RM 0</div>
+            <div class="risk-cnt" id="risk-cnt">0 items</div>
+          </div>
+        </div>
+        <div class="risk-list" id="risk-list"></div>
+      </div>
+    </div>
+
+    <div class="card decks">
+      <h3 class="card-h">Total Decks Per Strategist</h3>
+      <p class="card-sub">Cumulative proposal counts (done + ongoing)</p>
+      <div class="decks-wrap" id="decks"><div class="yaxis" id="decks-y"></div></div>
+    </div>
+
+    <div class="sec-head"><span class="star">★</span><span class="t">Secondary Performance Metrics</span></div>
+    <div class="lead-grid" id="leaders"></div>
+
+    <div class="grid-dc">
+      <div class="card chartcard">
+        <h3 class="card-h" style="margin-bottom:24px;">Budget Breakdown By Industry</h3>
+        <div class="donut-wrap">
+          <div class="donut"><div class="ring" id="donut-ring"></div><div class="hole"></div></div>
+          <div class="legend" id="donut-legend"></div>
+        </div>
+      </div>
+      <div class="card chartcard">
+        <h3 class="card-h" style="margin-bottom:24px;">Top 10 Categories</h3>
+        <div id="categories"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KANBAN -->
+  <section id="page-kanban" class="page">
+    <div class="kan-head">
+      <div>
+        <h2>Team Pods</h2>
+        <p>Ongoing proposal pipelines</p>
+      </div>
+      <div class="kan-legend">
+        <span><i style="background:var(--red);"></i>OVERDUE / TODAY</span>
+        <span><i style="background:var(--amber);"></i>DUE &lt;24H</span>
+        <span><i style="background:var(--accent);"></i>ON TRACK</span>
+      </div>
+    </div>
+    <div id="pods"></div>
+  </section>
+
+  <!-- SEARCH -->
+  <section id="page-search" class="page">
+    <div class="card search-bar">
+      <div class="search-in">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#A6A6AE" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search-input" placeholder="Search strategist, brand, project or ID…" oninput="onSearch()">
+      </div>
+      <div class="seg" id="filters"></div>
+    </div>
+    <div class="card results">
+      <div class="thead">
+        <span>ID &amp; Brand</span><span>Project Name</span><span>Strategist</span>
+        <span>Status</span><span style="text-align:right;">Budget (RM)</span><span style="text-align:right;">Deadline</span>
+      </div>
+      <div id="rows"></div>
+      <div id="no-results" style="display:none; padding:56px; text-align:center; color:#B0B0B8;">
+        <div style="font-size:15px; font-weight:700;">No proposals match your filters</div>
+      </div>
+      <div class="pager">
+        <div class="pager-info" id="pager-info"></div>
+        <div class="pager-btns" id="pager-btns"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   LIVE DATA — Code.gs replaces the marker below with the sheet payload.
+   Until then (preview / direct open) it stays null and SAMPLE_DATA renders.
+   ═══════════════════════════════════════════════════════════════════════ */
+var INJECTED = /*__STRATOS_DATA__*/null;
+
+var SAMPLE_DATA = {
+  generated_at: '23 Jun 2026, 00:16',
+  proposals: [
+    {id:'NOV26A', type:'REV Proposal', brand:'Miracle', project:'The Easiest AI Phone Positioning Campaign', budget:200000, strat:'Keith', cc:'Seng Sin', industry:'Electronics/Gadgets', status:'Done', deadline:'12/01/2026', score:7.2, generated_on:'2026-01-04'},
+    {id:'NOV27L', type:'REV Proposal', brand:'Harvey Norman', project:'Q1 Seasonal Campaigns (CNY & Feb Retail Focus)', budget:400000, strat:'Farah', cc:'Justin', industry:'Electronics/Gadgets', status:'Done', deadline:'03/12/2025', score:6.8, generated_on:'2025-12-01'},
+    {id:'DEC02K', type:'REV Proposal', brand:'Samsung', project:'Samsung AI Flagship Campaign', budget:200000, strat:'Keith', cc:'Seng Sin', industry:'Electronics/Gadgets', status:'Done', deadline:'03/12/2025', score:8.1, generated_on:'2025-12-02'},
+    {id:'DEC09D', type:'Revision', brand:'Monash', project:'Multiple Campaigns', budget:400000, strat:'Keith', cc:'Jia Hui', industry:'Government', status:'Done', deadline:'12/12/2025', score:5.9, generated_on:'2025-12-09'},
+    {id:'JAN06A', type:'REV Proposal', brand:'Samsung', project:'Avengers of Samsung', budget:400000, strat:'Keith', cc:'Seng Sin', industry:'Electronics/Gadgets', status:'Done', deadline:'07/01/2026', score:7.7, generated_on:'2026-01-06'},
+    {id:'JAN12A', type:'Topline Ideas', brand:'Jetour', project:'Proposal For Jetour', budget:120000, strat:'Ellysa', cc:'Jayne', industry:'Travel & Tourism', status:'Done', deadline:'14/01/2026', score:6.0, generated_on:'2026-01-12'},
+    {id:'JAN15A', type:'REV Proposal', brand:'LG', project:'Ramadan Raya with LG', budget:300000, strat:'Keith', cc:'Justin', industry:'Electronics/Gadgets', status:'Done', deadline:'16/01/2026', score:7.0, generated_on:'2026-01-15'},
+    {id:'FEB06A', type:'REV Proposal', brand:"Snicker's", project:'Ramadan Raya 2026', budget:131000, strat:'Farah', cc:'Haseef', industry:'FMCG - Food', status:'Done', deadline:'09/02/2026', score:6.5, generated_on:'2026-02-06'},
+    {id:'FEB09A', type:'REV Proposal', brand:'Toshiba Malaysia', project:'Ramadan & Raya 2026', budget:150000, strat:'Pritib', cc:'Justin', industry:'Electronics/Gadgets', status:'Done', deadline:'10/02/2026', score:6.3, generated_on:'2026-02-09'},
+    {id:'FEB09B', type:'Topline Proposal', brand:'Marrybrown', project:'Marrybrown 3x Spicy Ayam Goreng LTO', budget:60000, strat:'Natalie', cc:'Jia Hui', industry:'F&B', status:'Done', deadline:'11/02/2026', score:5.5, generated_on:'2026-02-09'},
+    {id:'FEB09C', type:'Initiative Proposal', brand:'Marrybrown', project:'Marrybrown Saver Promotion (Lunch Deals RM9.9 up to…)', budget:60000, strat:'Farah', cc:'Jayne', industry:'F&B', status:'Done', deadline:'11/02/2026', score:6.1, generated_on:'2026-02-09'},
+    {id:'FEB09D', type:'REV Proposal', brand:'IJM Land - Seremban 2', project:'Raya Campaign (AI KOL)', budget:100000, strat:'Suresh', cc:'Jayne', industry:'Property', status:'Done', deadline:'12/02/2026', score:6.6, generated_on:'2026-02-09'},
+    {id:'MAR04A', type:'REV Proposal', brand:'Maxis', project:'Hari Raya Connectivity Push', budget:250000, strat:'Farah', cc:'Justin', industry:'Banking/Finance', status:'Done', deadline:'06/03/2026', score:7.4, generated_on:'2026-03-04'},
+    {id:'MAR18B', type:'Proposal', brand:'Petronas', project:'Merdeka Brand Film Topline', budget:320000, strat:'Keith', cc:'Seng Sin', industry:'Government', status:'Done', deadline:'20/03/2026', score:8.3, generated_on:'2026-03-18'},
+    {id:'APR02C', type:'Revision', brand:'Watsons', project:'Health & Beauty Always-On', budget:140000, strat:'Pritib', cc:'Haseef', industry:'FMCG - Pharmaceutical', status:'Done', deadline:'05/04/2026', score:6.2, generated_on:'2026-04-02'},
+    {id:'APR21D', type:'REV Proposal', brand:'AirAsia', project:'Domestic Travel Recovery', budget:180000, strat:'Suresh', cc:'Jia Hui', industry:'Travel & Tourism', status:'Done', deadline:'24/04/2026', score:6.9, generated_on:'2026-04-21'},
+    {id:'MAY09E', type:'Topline Ideas', brand:'Sunway', project:'Themepark Summer Splash', budget:90000, strat:'Harisha', cc:'Jayne', industry:'Themepark/Recreational', status:'Done', deadline:'12/05/2026', score:5.8, generated_on:'2026-05-09'},
+    {id:'MAY22F', type:'REV Proposal', brand:'CIMB', project:'Digital Banking Onboarding', budget:260000, strat:'Farah', cc:'Justin', industry:'Banking/Finance', status:'Done', deadline:'25/05/2026', score:7.1, generated_on:'2026-05-22'},
+    {id:'JUN02G', type:'Proposal', brand:'Nestlé', project:'Milo Energy Topline', budget:210000, strat:'Pritib', cc:'Seng Sin', industry:'FMCG - Drinks', status:'Done', deadline:'05/06/2026', score:6.7, generated_on:'2026-06-02'},
+    {id:'JUN19W', type:'REV Proposal', brand:'Webull', project:'On ground activation (Pavillion KL, TRX, and other suggestions)', budget:250000, strat:'Yaya', cc:'Haseef', industry:'Banking/Finance', status:'Pending', deadline:'19/06/2026', score:0, generated_on:'2026-06-12'},
+    {id:'JUN22D', type:'Proposal', brand:'Dettol', project:'Proposal For Dettol', budget:150000, strat:'Yaya', cc:'Haseef', industry:'FMCG - Pharmaceutical', status:'Pending', deadline:'22/06/2026', score:0, generated_on:'2026-06-14'},
+    {id:'JUN22F', type:'REV Proposal', brand:'F&N Est Cola', project:'F&N Est Cola Brief | Ini Cola Kita - Jul-Oct/Nov 2026', budget:290000, strat:'Annette', cc:'Chelle', industry:'FMCG - Drinks', status:'Pending', deadline:'22/06/2026', score:0, generated_on:'2026-06-15'},
+    {id:'JUN22B', type:'Proposal', brand:'Bank Negara Malaysia', project:'BNM Museum & Art Gallery and Financial Services Library', budget:150000, strat:'Yaya', cc:'Saiful', industry:'Government', status:'Pending', deadline:'22/06/2026', score:0, generated_on:'2026-06-16'},
+    {id:'JUN24M', type:'Topline Proposal', brand:'Mister Potato', project:'Mister Potato x KFC Cheezy Wedges', budget:150000, strat:'Pritib', cc:'Jia Hui', industry:'FMCG - Food', status:'Pending', deadline:'24/06/2026', score:0, generated_on:'2026-06-17'},
+    {id:'JUN25F', type:'REV Proposal', brand:'F&N Canned Milk', project:'Sarapanmu Lebih Jadi dengan F&N', budget:180000, strat:'Farukh', cc:'Chelle', industry:'FMCG - Food', status:'Pending', deadline:'25/06/2026', score:0, generated_on:'2026-06-18'},
+    {id:'JUN25I', type:'Initiative Proposal', brand:'IJM Land [Seremban 2 - Ikon Residences]', project:'The GOLD Standard of Comfort', budget:55000, strat:'Danesh', cc:'Saiful', industry:'Property', status:'Pending', deadline:'25/06/2026', score:0, generated_on:'2026-06-18'},
+    {id:'JUN26K', type:'Topline Ideas', brand:'IJM Land [Seremban 2]', project:'EV Charging Lifestyle Campaign', budget:48000, strat:'Danesh', cc:'Saiful', industry:'Property', status:'Pending', deadline:'30/06/2026', score:0, generated_on:'2026-06-19'},
+    {id:'JUN27N', type:'Proposal', brand:'Maybank', project:'Sustainability Report Launch', budget:175000, strat:'Min', cc:'Jayne', industry:'Banking/Finance', status:'Pending', deadline:'01/07/2026', score:0, generated_on:'2026-06-20'}
+  ]
+};
+
+/* Pod structure mirrors Code.gs so client-side fallback matches the server. */
+var POD_STRUCTURE = {
+  "Iylia's Pod":  ["Annette", "Iman", "Farukh", "Min"],
+  "Nadiah's Pod": ["Pritib", "Keith", "Harisha", "Natalie", "Danesh"],
+  "Rudy's Pod":   ["Suresh", "Ellysa", "Farah", "Yaya"]
+};
+var NAME_ALIASES = { "Danesh": ["Danesh","Dan"] };
+
+var DATA = INJECTED || SAMPLE_DATA;
+
+/* ── helpers ─────────────────────────────────────────────────────────── */
+function isDone(s){ s=(s||'').toLowerCase(); return s==='done'||s==='completed'; }
+function fmtM(n){ if(n>=1e6) return 'RM '+(n/1e6).toFixed(1)+'M'; if(n>=1e3) return 'RM '+Math.round(n/1e3)+'K'; return 'RM '+Math.round(n); }
+function fmtFull(n){ return 'RM '+Math.round(n).toLocaleString('en-US'); }
+function parseDmy(s){ if(!s) return null; var p=s.split('/'); if(p.length!==3) return null; return new Date(+p[2],+p[1]-1,+p[0]); }
+function todayMid(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
+
+/* ── derive at_risk & pods if the server didn't supply them (preview) ──── */
+function ensureDerived(){
+  if(!DATA.at_risk_items){
+    var t=todayMid();
+    DATA.at_risk_items = DATA.proposals.filter(function(p){
+      var d=parseDmy(p.deadline); return !isDone(p.status) && d && d<t;
+    }).sort(function(a,b){ return parseDmy(a.deadline)-parseDmy(b.deadline); })
+      .slice(0,10)
+      .map(function(p){ return {id:p.id,brand:p.brand,project:p.project,deadline:p.deadline,budget:p.budget,strat:p.strat,cc:p.cc}; });
+  }
+  if(!DATA.pods){
+    var pods={};
+    Object.keys(POD_STRUCTURE).forEach(function(podName){
+      pods[podName]={};
+      POD_STRUCTURE[podName].forEach(function(name){
+        var aliases=NAME_ALIASES[name]||[name];
+        var active=DATA.proposals.filter(function(p){ return aliases.indexOf(p.strat)>-1 && !isDone(p.status); })
+          .sort(function(a,b){ return (parseDmy(a.deadline)||0)-(parseDmy(b.deadline)||0); });
+        pods[podName][name]={
+          budget:active.reduce(function(s,p){return s+p.budget;},0),
+          active:active.length,
+          items:active.slice(0,6).map(function(p){ return {id:p.id,brand:p.brand,project:p.project,deadline:p.deadline,budget:p.budget}; })
+        };
+      });
+    });
+    DATA.pods=pods;
+  }
+}
+
+/* ── period filter (by generated_on) ─────────────────────────────────── */
+var period = 'All Time';
+function filterByPeriod(props){
+  if(period==='All Time') return props;
+  var now=new Date(), cut=new Date();
+  if(period==='This Month'){ cut.setDate(1); cut.setHours(0,0,0,0); }
+  if(period==='Past 30 Days'){ cut.setDate(now.getDate()-30); }
+  if(period==='Past Week'){ cut.setDate(now.getDate()-7); }
+  return props.filter(function(p){ return p.generated_on && new Date(p.generated_on)>=cut; });
+}
+
+/* ── metrics ─────────────────────────────────────────────────────────── */
+function computeMetrics(props){
+  var m={ totalValue:0, doneCount:0, pendingCount:0, totalScore:0, scoredCount:0,
+    stratPending:{}, stratTotal:{}, stratDone:{}, ccCount:{}, industryBudget:{}, deckTypes:{} };
+  props.forEach(function(p){
+    m.totalValue+=p.budget;
+    var done=isDone(p.status);
+    if(done) m.doneCount++; else if(p.strat) m.pendingCount++;
+    if(p.score>0){ m.totalScore+=p.score; m.scoredCount++; }
+    if(p.strat && p.strat!=='N/A'){
+      if(!m.stratTotal[p.strat]) m.stratTotal[p.strat]={count:0,budget:0};
+      m.stratTotal[p.strat].count++; m.stratTotal[p.strat].budget+=p.budget;
+      if(!done){ if(!m.stratPending[p.strat]) m.stratPending[p.strat]={count:0,budget:0};
+        m.stratPending[p.strat].count++; m.stratPending[p.strat].budget+=p.budget; }
+      else m.stratDone[p.strat]=(m.stratDone[p.strat]||0)+1;
+    }
+    if(p.cc && p.cc!=='N/A') m.ccCount[p.cc]=(m.ccCount[p.cc]||0)+1;
+    if(p.industry) m.industryBudget[p.industry]=(m.industryBudget[p.industry]||0)+p.budget;
+    if(p.type) m.deckTypes[p.type]=(m.deckTypes[p.type]||0)+1;
+  });
+  m.avgScore = m.scoredCount>0 ? m.totalScore/m.scoredCount : 0;
+  return m;
+}
+function sortObj(o,key){ return Object.keys(o).map(function(k){return [k,o[k]];}).sort(function(a,b){return b[1][key]-a[1][key];}); }
+function sortNum(o){ return Object.keys(o).map(function(k){return [k,o[k]];}).sort(function(a,b){return b[1]-a[1];}); }
+
+/* ── palette ─────────────────────────────────────────────────────────── */
+var ACCENT='#6D5BE0';
+function lighten(hex,amt){ var c=hex.replace('#',''); var r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16);
+  var m=function(x){return Math.round(x+(255-x)*amt);}; return 'rgb('+m(r)+','+m(g)+','+m(b)+')'; }
+var IND_COLORS=[ACCENT, lighten(ACCENT,.15), lighten(ACCENT,.3), lighten(ACCENT,.45), lighten(ACCENT,.58),
+  lighten(ACCENT,.7), '#F2792B', '#F59E42', '#FACC3D', '#84CC3A'];
+var RANK_COLORS=[['#FEF3C7','#B45309'],['#F1F5F9','#64748B'],['#FFEDD5','#C2410C'],['var(--accent-10)','var(--accent)'],['var(--accent-10)','var(--accent)']];
+
+/* ── COUNTUP ─────────────────────────────────────────────────────────── */
+function countUp(el,to,prefix,suffix,dec){
+  var dur=1100, start=performance.now(), comma=to>=1000;
+  function step(now){ var p=Math.min(1,(now-start)/dur); p=1-Math.pow(1-p,3); var v=to*p;
+    el.textContent=prefix+(comma?Math.round(v).toLocaleString('en-US'):v.toFixed(dec))+suffix;
+    if(p<1) requestAnimationFrame(step); }
+  requestAnimationFrame(step);
+}
+
+/* ═══ DASHBOARD ═══ */
+function renderDashboard(){
+  var props=filterByPeriod(DATA.proposals);
+  var m=computeMetrics(props);
+
+  // KPIs
+  var kpis=[
+    {label:'Total Proposed Value', el:null, to:m.totalValue/1e6, prefix:'RM ', suffix:'M', dec:1, icon:'$', tint:'var(--green)', bg:'#ECFDF5'},
+    {label:'Total Proposals Submitted', to:m.doneCount, prefix:'', suffix:'', dec:0, icon:'▶', tint:'var(--accent)', bg:'var(--accent-10)'},
+    {label:'Total Proposals Ongoing', to:m.pendingCount, prefix:'', suffix:'', dec:0, icon:'!', tint:'var(--amber)', bg:'#FFFBEB'},
+    {label:'Average Brief Score', to:m.avgScore, prefix:'', suffix:'', dec:1, icon:'★', tint:'var(--violet)', bg:'#F5F3FF'}
+  ];
+  var kc=document.getElementById('kpis'); kc.innerHTML='';
+  kpis.forEach(function(k){
+    var d=document.createElement('div'); d.className='card kpi';
+    d.innerHTML='<div class="kpi-top"><div class="kpi-ico" style="background:'+k.bg+'; color:'+k.tint+';">'+k.icon+'</div>'+
+      '<span class="kpi-lbl">'+k.label+'</span></div><div class="kpi-val">'+k.prefix+'0'+k.suffix+'</div>';
+    kc.appendChild(d);
+    countUp(d.querySelector('.kpi-val'), k.to, k.prefix, k.suffix, k.dec);
+  });
+
+  // Workload
+  var wl=sortObj(m.stratPending,'count');
+  var wlMax=Math.max(3, wl.length?wl[0][1].count:0);
+  var wly=document.getElementById('workload-y'); wly.innerHTML='';
+  for(var i=wlMax;i>=0;i--){ var s=document.createElement('span'); s.textContent=i; wly.appendChild(s); }
+  var wlBox=document.getElementById('workload');
+  wlBox.querySelectorAll('.bar-col').forEach(function(n){n.remove();});
+  wl.forEach(function(e){
+    var col=document.createElement('div'); col.className='bar-col';
+    col.innerHTML='<div class="bar"></div><span class="bar-name">'+e[0]+'</span>';
+    wlBox.appendChild(col);
+    var bar=col.querySelector('.bar');
+    requestAnimationFrame(function(){ bar.style.height=(e[1].count/wlMax*100)+'%'; });
+  });
+
+  // Decks
+  var dk=sortObj(m.stratTotal,'count');
+  var dkMax=Math.max(5, dk.length?dk[0][1].count:0);
+  var step=dkMax>20?5:(dkMax>10?5:2);
+  var dky=document.getElementById('decks-y'); dky.innerHTML='';
+  for(var v=dkMax; v>=0; v-=step){ var sp=document.createElement('span'); sp.textContent=v; dky.appendChild(sp); }
+  var dkBox=document.getElementById('decks');
+  dkBox.querySelectorAll('.bar-col').forEach(function(n){n.remove();});
+  dk.forEach(function(e,idx){
+    var col=document.createElement('div'); col.className='bar-col';
+    col.innerHTML='<div class="bar"></div><span class="decks-name">'+e[0]+'</span>';
+    dkBox.appendChild(col);
+    var bar=col.querySelector('.bar');
+    if(idx%2===1) bar.style.background=lighten(ACCENT,.42);
+    requestAnimationFrame(function(){ bar.style.height=(e[1].count/dkMax*100)+'%'; });
+  });
+
+  // At-risk
+  var risk=DATA.at_risk_items||[];
+  var riskTotal=risk.reduce(function(s,r){return s+r.budget;},0);
+  document.getElementById('risk-amt').textContent=fmtFull(riskTotal);
+  document.getElementById('risk-cnt').textContent=risk.length+' item'+(risk.length===1?'':'s');
+  var rl=document.getElementById('risk-list'); rl.innerHTML='';
+  if(!risk.length){
+    rl.innerHTML='<div class="empty"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6 9 17l-5-5"/></svg><span>NO ITEMS AT RISK</span></div>';
+  } else {
+    risk.forEach(function(r){
+      var d=document.createElement('div'); d.className='risk-item';
+      d.innerHTML=
+        '<div class="risk-client">'+esc(r.brand)+'</div>'+
+        '<p class="risk-proj">'+esc(r.project)+'</p>'+
+        '<div class="risk-people"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="flex:none;"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>'+
+        '<span style="overflow:hidden; text-overflow:ellipsis;">'+esc(r.strat||'—')+' · CC: '+esc(r.cc||'—')+'</span></div>'+
+        '<div class="risk-meta"><span class="risk-due"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17.4v.01"/></svg>Due '+r.deadline+'</span>'+
+        '<span class="risk-val">'+fmtFull(r.budget)+'</span></div>';
+      rl.appendChild(d);
+    });
+  }
+
+  // Leaderboards
+  var leaders=[
+    {ico:icoTrend(), title:'Top 5 Strategist (Value)', rows:sortObj(m.stratTotal,'budget').slice(0,5).map(function(e){return [e[0],fmtM(e[1].budget)];})},
+    {ico:icoPlay(),  title:'Top 5 Proposals Done', rows:sortNum(m.stratDone).slice(0,5).map(function(e){return [e[0],e[1]+' decks'];})},
+    {ico:icoUsers(), title:'Top 5 Client Champions', rows:sortNum(m.ccCount).slice(0,5).map(function(e){return [e[0],e[1]+' briefs'];})}
+  ];
+  var lg=document.getElementById('leaders'); lg.innerHTML='';
+  leaders.forEach(function(L){
+    var card=document.createElement('div'); card.className='card lead';
+    var rows=L.rows.map(function(r,i){
+      var rc=RANK_COLORS[i]||RANK_COLORS[4];
+      return '<div class="lead-row"><span class="rank" style="background:'+rc[0]+'; color:'+rc[1]+';">'+(i+1)+'</span>'+
+        '<span class="lead-name">'+esc(r[0])+'</span><span class="lead-val">'+r[1]+'</span></div>';
+    }).join('') || '<div class="lead-row" style="color:#B0B0B8;">No data</div>';
+    card.innerHTML='<div class="lead-h"><span class="ico">'+L.ico+'</span><span class="t">'+L.title+'</span></div>'+rows;
+    lg.appendChild(card);
+  });
+
+  // Donut
+  var ind=sortNum(m.industryBudget).slice(0,10);
+  var indTotal=ind.reduce(function(s,e){return s+e[1];},0)||1;
+  var acc=0, segs=ind.map(function(e,i){ var st=acc; acc+=e[1]/indTotal*100; return IND_COLORS[i%IND_COLORS.length]+' '+st+'% '+acc+'%'; });
+  var ring=document.getElementById('donut-ring');
+  ring.style.background='conic-gradient('+segs.join(', ')+')';
+  requestAnimationFrame(function(){ ring.style.opacity='1'; ring.style.transform='rotate(0deg) scale(1)'; });
+  var leg=document.getElementById('donut-legend'); leg.innerHTML='';
+  ind.forEach(function(e,i){
+    var d=document.createElement('div'); d.className='legend-row';
+    d.innerHTML='<span class="sw" style="background:'+IND_COLORS[i%IND_COLORS.length]+';"></span>'+esc(e[0]);
+    leg.appendChild(d);
+  });
+
+  // Categories
+  var cats=sortNum(m.deckTypes).slice(0,10);
+  var catMax=cats.length?cats[0][1]:1;
+  var cc=document.getElementById('categories'); cc.innerHTML='';
+  cats.forEach(function(e){
+    var d=document.createElement('div'); d.className='cat-row';
+    d.innerHTML='<span class="cat-name">'+esc(e[0])+'</span><div class="cat-track"><div class="cat-fill"></div></div>';
+    cc.appendChild(d);
+    var fill=d.querySelector('.cat-fill');
+    requestAnimationFrame(function(){ fill.style.width=(e[1]/catMax*100)+'%'; });
+  });
+}
+
+/* ═══ KANBAN ═══ */
+function ticketClass(deadline){
+  var d=parseDmy(deadline); if(!d) return '';
+  var t=todayMid();
+  if(d<=t) return 'over';
+  var diffH=(d-new Date())/3.6e6;
+  if(diffH<24) return 'soon';
+  return '';
+}
+function renderKanban(){
+  var box=document.getElementById('pods'); box.innerHTML='';
+  Object.keys(DATA.pods).forEach(function(podName){
+    var members=DATA.pods[podName];
+    var totalActive=0, totalBudget=0;
+    Object.keys(members).forEach(function(n){ totalActive+=members[n].active; totalBudget+=members[n].budget; });
+    var cards=Object.keys(members).map(function(name){
+      var md=members[name];
+      var items = md.items.length===0
+        ? '<div class="empty" style="flex:1;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>NO ONGOING ITEMS</span></div>'
+        : '<div class="strat-items">'+md.items.map(function(it){
+            var cls=ticketClass(it.deadline);
+            return '<div class="ticket '+cls+'"><div class="ticket-client">'+esc(it.brand)+'</div>'+
+              '<div class="ticket-proj">'+esc(it.project)+'</div>'+
+              '<div class="ticket-due"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><rect x="3" y="4.5" width="18" height="17" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>'+it.deadline+' · '+fmtM(it.budget)+'</div></div>';
+          }).join('')+'</div>';
+      return '<div class="strat"><div class="strat-top"><span class="strat-name">'+esc(name)+'</span><span style="color:#C9C9CF; font-weight:800;">⋮</span></div>'+
+        '<div class="strat-val">'+fmtFull(md.budget)+'</div><div class="strat-active">'+md.active+' ACTIVE</div>'+items+'</div>';
+    }).join('');
+    var pod=document.createElement('div'); pod.className='pod';
+    pod.innerHTML='<div class="pod-top"><h3 class="pod-name"><i></i>'+esc(podName)+'</h3>'+
+      '<div class="pod-stats"><div class="pod-stat"><div class="k">PIPELINE</div><div class="v">'+totalActive+'</div></div>'+
+      '<div class="pod-stat"><div class="k">POD VALUE</div><div class="v">'+fmtFull(totalBudget)+'</div></div></div></div>'+
+      '<div class="pod-rule"></div><div class="pod-grid">'+cards+'</div>';
+    box.appendChild(pod);
+  });
+}
+
+/* ═══ SEARCH ═══ */
+var sFilter='ALL', sPage=1, PER=20;
+function getFiltered(){
+  var q=(document.getElementById('search-input').value||'').toLowerCase().trim();
+  return DATA.proposals.filter(function(p){
+    if(sFilter==='PENDING' && isDone(p.status)) return false;
+    if(sFilter==='DONE' && !isDone(p.status)) return false;
+    if(q && !([p.strat,p.brand,p.project,p.id,p.cc].some(function(v){return v&&String(v).toLowerCase().indexOf(q)>-1;}))) return false;
+    return true;
+  });
+}
+function onSearch(){ sPage=1; renderSearch(); }
+function renderSearch(){
+  var list=getFiltered(), total=list.length;
+  var start=(sPage-1)*PER, end=Math.min(start+PER,total);
+  document.getElementById('no-results').style.display = total===0?'block':'none';
+  var rows=document.getElementById('rows'); rows.innerHTML='';
+  var t=todayMid();
+  list.slice(start,end).forEach(function(p){
+    var done=isDone(p.status);
+    var sc = done?'var(--green)':'var(--amber)';
+    var sbg= done?'#ECFDF5':'#FFFBEB';
+    var d=parseDmy(p.deadline);
+    var over = d && !done && d<t;
+    var r=document.createElement('div'); r.className='trow';
+    r.innerHTML=
+      '<div><span class="id-badge">'+esc(p.id)+'</span><div class="t-brand">'+esc(p.brand)+'</div></div>'+
+      '<span class="t-proj">'+esc(p.project)+'</span>'+
+      '<span class="t-strat">'+esc(p.strat||'—')+'</span>'+
+      '<span><span class="status-badge" style="color:'+sc+'; background:'+sbg+';"><i style="background:'+sc+';"></i>'+(done?'Done':(p.status||'Ongoing'))+'</span></span>'+
+      '<span class="t-budget">'+(p.budget?fmtFull(p.budget):'—')+'</span>'+
+      '<span class="t-deadline'+(over?' over':'')+'">'+(p.deadline||'—')+'</span>';
+    rows.appendChild(r);
+  });
+  document.getElementById('pager-info').textContent = total===0?'No results':('Showing '+(start+1)+'–'+end+' of '+total+' items');
+  var pages=Math.ceil(total/PER), btns=document.getElementById('pager-btns'); btns.innerHTML='';
+  if(pages>1){
+    var mk=function(label,page,on,dis){ var b=document.createElement('button'); b.textContent=label; if(on)b.className='on'; b.disabled=dis;
+      b.onclick=function(){ sPage=page; renderSearch(); }; btns.appendChild(b); };
+    mk('‹',sPage-1,false,sPage===1);
+    for(var i=1;i<=Math.min(pages,7);i++) mk(i,i,i===sPage,false);
+    mk('›',sPage+1,false,sPage===pages);
+  }
+}
+
+/* ── nav / period / filters ──────────────────────────────────────────── */
+function buildNav(){
+  var items=[['dashboard','DASHBOARD',icoDash()],['kanban','KANBAN',icoKan()],['search','SEARCH',icoSearch()]];
+  var nav=document.getElementById('nav'); nav.innerHTML='';
+  items.forEach(function(it){
+    var b=document.createElement('button'); if(it[0]==='dashboard') b.className='on';
+    b.innerHTML=it[2]+it[1]; b.onclick=function(){ showPage(it[0],b); };
+    nav.appendChild(b);
+  });
+}
+function showPage(name,btn){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('on');});
+  document.getElementById('page-'+name).classList.add('on');
+  document.querySelectorAll('#nav button').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  document.getElementById('period-row').style.display = name==='dashboard'?'flex':'none';
+  if(name==='dashboard') renderDashboard();
+}
+function buildPeriod(){
+  var ps=['All Time','This Month','Past 30 Days','Past Week'];
+  var box=document.getElementById('period'); box.innerHTML='';
+  ps.forEach(function(p){
+    var b=document.createElement('button'); if(p===period) b.className='on'; b.textContent=p;
+    b.onclick=function(){ period=p; document.querySelectorAll('#period button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); renderDashboard(); };
+    box.appendChild(b);
+  });
+}
+function buildFilters(){
+  var fs=['ALL','PENDING','DONE'];
+  var box=document.getElementById('filters'); box.innerHTML='';
+  fs.forEach(function(f){
+    var b=document.createElement('button'); if(f===sFilter) b.className='on'; b.textContent=f;
+    b.onclick=function(){ sFilter=f; sPage=1; document.querySelectorAll('#filters button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); renderSearch(); };
+    box.appendChild(b);
+  });
+}
+
+/* ── countdown ───────────────────────────────────────────────────────── */
+function startCountdown(){
+  var secs=3600;
+  setInterval(function(){
+    secs--; if(secs<=0){ location.reload(); return; }
+    var mm=String(Math.floor(secs/60)).padStart(2,'0'), ss=String(secs%60).padStart(2,'0');
+    document.getElementById('countdown').textContent=mm+':'+ss;
+  },1000);
+}
+
+/* ── tiny inline icons ───────────────────────────────────────────────── */
+function icoDash(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg>'; }
+function icoKan(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="5" height="14" rx="1.5"/><rect x="10" y="3" width="5" height="18" rx="1.5"/><rect x="17" y="3" width="5" height="9" rx="1.5"/></svg>'; }
+function icoSearch(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'; }
+function icoTrend(){ return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16.5l5-5 4 4 8.5-9"/><path d="M16 6.5h4.5V11"/></svg>'; }
+function icoPlay(){ return '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5v13a1 1 0 0 0 1.5.86l10-6.5a1 1 0 0 0 0-1.72l-10-6.5A1 1 0 0 0 7 5.5Z"/></svg>'; }
+function icoUsers(){ return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17.5" cy="9" r="2.4"/><path d="M15.5 14.4a5 5 0 0 1 6 4.6"/></svg>'; }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ── boot ────────────────────────────────────────────────────────────── */
+ensureDerived();
+document.getElementById('gen-at').textContent = DATA.generated_at || '—';
+buildNav(); buildPeriod(); buildFilters();
+renderDashboard(); renderKanban(); renderSearch();
+startCountdown();
+</script>
+</body>
+</html>
